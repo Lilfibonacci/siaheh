@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:siaheh/core/di/injection_container.dart';
 import 'package:siaheh/core/router/app_global_router.dart';
 import 'package:siaheh/core/theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await configureDependencies();
   runApp(const MyApp());
 }
 

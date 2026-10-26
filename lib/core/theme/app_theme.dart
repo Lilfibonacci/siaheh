@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_fonts.dart';
 
 class AppTheme {
   AppTheme._();
@@ -14,7 +15,7 @@ class AppTheme {
       brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.lightBackground,
       primaryColor: AppColors.goldLightTheme,
-      fontFamily: 'Vazirmatn',
+      fontFamily: AppFonts.family,
 
       colorScheme: const ColorScheme.light(
         primary: AppColors.goldLightTheme,
@@ -38,7 +39,7 @@ class AppTheme {
           color: AppColors.lightTextPrimary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          fontFamily: 'Vazirmatn',
+          fontFamily: AppFonts.family,
         ),
       ),
 
@@ -74,7 +75,7 @@ class AppTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.darkBackground,
       primaryColor: AppColors.goldDarkTheme,
-      fontFamily: 'Vazirmatn',
+      fontFamily: AppFonts.family,
 
       colorScheme: const ColorScheme.dark(
         primary: AppColors.goldDarkTheme,
@@ -98,7 +99,7 @@ class AppTheme {
           color: AppColors.darkTextPrimary,
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          fontFamily: 'Vazirmatn',
+          fontFamily: AppFonts.family,
         ),
       ),
 
