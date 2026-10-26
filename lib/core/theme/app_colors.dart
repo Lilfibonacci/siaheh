@@ -33,6 +33,13 @@ class AppColors {
   static const Color crimsonDark = Color(0xFFEF4444);
   static const Color crimsonLight = Color(0xFFDC2626);
 
+  // آبی (انتقال بین حساب‌های خود کاربر)
+  static const Color transferDark = Color(0xFF60A5FA);
+  static const Color transferLight = Color(0xFF2563EB);
+
+  static Color transfer(Brightness brightness) =>
+      brightness == Brightness.dark ? transferDark : transferLight;
+
   // ======================== GRADIENTS ===============================
   // گرادینت کارت موجودی کل در حالت تیره
   static const LinearGradient darkHeaderGradient = LinearGradient(

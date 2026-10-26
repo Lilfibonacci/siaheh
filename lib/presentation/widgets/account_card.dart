@@ -1,0 +1,75 @@
+import 'package:flutter/material.dart';
+import 'package:siaheh/core/utils/persian_format.dart';
+import 'package:siaheh/presentation/mock/ui_models.dart';
+import 'package:siaheh/presentation/widgets/bank_logo.dart';
+
+class AccountCard extends StatelessWidget {
+  const AccountCard({super.key, required this.account});
+
+  final UiAccount account;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+
+    return Container(
+      width: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              BankLogo(bankKey: account.bank.key, size: 40),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  account.bank.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            'کارت •••• ${PersianFormat.digits(account.last4)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    PersianFormat.toman(account.balanceRial),
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'تومان',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
