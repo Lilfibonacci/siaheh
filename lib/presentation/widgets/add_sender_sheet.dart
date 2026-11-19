@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:siaheh/presentation/mock/mock_data.dart';
-import 'package:siaheh/presentation/mock/ui_models.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
+import 'package:siaheh/presentation/bloc/finance_bloc.dart';
+import 'package:siaheh/presentation/bloc/finance_event.dart';
+import 'package:siaheh/presentation/widgets/bank_icon_resolver.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
 
-/// Bottom sheet to register an SMS sender number as a bank (UI only).
+/// Bottom sheet to manually register a numeric or alphanumeric bank SMS sender.
 Future<void> showAddSenderSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -21,14 +24,28 @@ class _AddSenderSheet extends StatefulWidget {
 }
 
 class _AddSenderSheetState extends State<_AddSenderSheet> {
-  UiBank? _bank;
+  final TextEditingController _number = TextEditingController();
+  final TextEditingController _bankName = TextEditingController();
+  String? _bankKey;
+
+  @override
+  void dispose() {
+    _number.dispose();
+    _bankName.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -37,42 +54,65 @@ class _AddSenderSheetState extends State<_AddSenderSheet> {
             Text('افزودن سرشماره بانک', style: theme.textTheme.titleLarge),
             const SizedBox(height: 6),
             Text(
-              'شماره‌ای که بانک از آن برای شما پیامک می‌فرستد را وارد کنید.',
+              'سرشماره عددی (مثلاً +9830007100) یا شناسه حروفی بانک (مثلاً BluBank) را وارد کنید.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 16),
-            const TextField(
-              keyboardType: TextInputType.phone,
+            TextField(
+              controller: _number,
+              onChanged: (_) => setState(() {}),
+              keyboardType: TextInputType.text,
               textDirection: TextDirection.ltr,
-              decoration: InputDecoration(
-                labelText: 'سرشماره',
-                hintText: '+98 3000 xxxx',
+              decoration: const InputDecoration(
+                labelText: 'سرشماره یا شناسه فرستنده',
+                hintText: 'BluBank یا +9830007100',
                 prefixIcon: Icon(Icons.sms_outlined),
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
-            Text('بانک', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final UiBank b in MockData.banks)
-                  ChoiceChip(
-                    selected: _bank == b,
-                    onSelected: (_) => setState(() => _bank = b),
-                    avatar: BankLogo(bankKey: b.key, size: 24),
-                    label: Text(b.name),
-                  ),
-              ],
+            TextField(
+              controller: _bankName,
+              textInputAction: TextInputAction.done,
+              onChanged: (v) =>
+                  setState(() => _bankKey = BankIconResolver.resolve(v)),
+              decoration: InputDecoration(
+                labelText: 'نام بانک',
+                hintText: 'مثلاً ملی، ملت، بلوبانک، پاسارگاد',
+                border: const OutlineInputBorder(),
+                prefixIcon: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: _bankKey == null
+                      ? const Icon(Icons.account_balance_rounded)
+                      : BankLogo(
+                          key: ValueKey(_bankKey),
+                          bankKey: _bankKey!,
+                          size: 32,
+                        ),
+                ),
+              ),
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: () => Navigator.pop(context),
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              onPressed: _number.text.trim().isEmpty || _bankKey == null
+                  ? null
+                  : () {
+                      context.read<FinanceBloc>().add(
+                        FinanceSenderAdded(
+                          SmsSender(
+                            number: _number.text.trim(),
+                            bankKey: _bankKey!,
+                            autoDetected: false,
+                          ),
+                        ),
+                      );
+                      Navigator.pop(context);
+                    },
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
               child: const Text('افزودن'),
             ),
           ],

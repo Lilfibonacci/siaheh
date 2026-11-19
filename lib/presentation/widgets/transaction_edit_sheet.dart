@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:siaheh/core/theme/app_colors.dart';
-import 'package:siaheh/presentation/mock/mock_data.dart';
-import 'package:siaheh/presentation/mock/ui_models.dart';
-import 'package:siaheh/presentation/widgets/bank_logo.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:siaheh/features/sms/domain/entities/bank_transaction.dart';
+import 'package:siaheh/presentation/bloc/finance_bloc.dart';
+import 'package:siaheh/presentation/bloc/finance_event.dart';
+import 'package:siaheh/presentation/models/finance_ui_models.dart';
 
-/// Bottom sheet to correct a parsed transaction (UI only).
+/// Bottom sheet to inspect raw SMS and correct or delete a parsed transaction.
 Future<void> showTransactionEditSheet(BuildContext context, UiTransaction tx) {
   return showModalBottomSheet<void>(
     context: context,
@@ -26,10 +27,52 @@ class _TransactionEditSheet extends StatefulWidget {
 class _TransactionEditSheetState extends State<_TransactionEditSheet> {
   late UiTxType _type = widget.tx.type;
   late UiCategory _category = widget.tx.category;
-  late UiAccount _account = MockData.accounts.firstWhere(
-    (a) => a.bank.key == widget.tx.account.bank.key,
-    orElse: () => MockData.accounts.first,
+  late final TextEditingController _title = TextEditingController(
+    text: widget.tx.title,
   );
+  late final TextEditingController _amount = TextEditingController(
+    text: '${widget.tx.amountRial ~/ 10}',
+  );
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _amount.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final bloc = context.read<FinanceBloc>();
+    final BankTransaction? original = bloc.state.transactions
+        .where((t) => t.id == widget.tx.id)
+        .firstOrNull;
+    if (original == null) return;
+    final toman = int.tryParse(_amount.text.replaceAll(',', '').trim());
+    final newType = switch (_type) {
+      UiTxType.income => TransactionType.income,
+      UiTxType.expense => TransactionType.expense,
+      UiTxType.transfer => TransactionType.transfer,
+    };
+    bloc.add(
+      FinanceTransactionUpdated(
+        original.copyWith(
+          type: newType,
+          amountRial: toman == null ? null : toman * 10,
+          title: _title.text.trim().isEmpty ? null : _title.text.trim(),
+          categoryId: _category.name,
+          needsReview: false,
+          clearLinkedTransfer: newType != TransactionType.transfer,
+          userEdited: true,
+        ),
+      ),
+    );
+    Navigator.pop(context);
+  }
+
+  void _delete() {
+    context.read<FinanceBloc>().add(FinanceTransactionDeleted(widget.tx.id));
+    Navigator.pop(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +92,34 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('ویرایش تراکنش', style: theme.textTheme.titleLarge),
+            if (widget.tx.rawBody.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: scheme.outline),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'متن اصلی پیامک (${widget.tx.account.bank.name})',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.tx.rawBody,
+                      style: theme.textTheme.bodySmall?.copyWith(height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -65,7 +136,7 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
             ),
             const SizedBox(height: 16),
             TextFormField(
-              initialValue: widget.tx.amountRial ~/ 10 == 0 ? '' : '${widget.tx.amountRial ~/ 10}',
+              controller: _amount,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'مبلغ (تومان)',
@@ -75,31 +146,11 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
             ),
             const SizedBox(height: 12),
             TextFormField(
-              initialValue: widget.tx.title,
+              controller: _title,
               decoration: const InputDecoration(
                 labelText: 'عنوان',
                 prefixIcon: Icon(Icons.edit_note_rounded),
                 border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('حساب', style: theme.textTheme.titleSmall),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 44,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: MockData.accounts.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final UiAccount a = MockData.accounts[i];
-                  return ChoiceChip(
-                    selected: a == _account,
-                    onSelected: (_) => setState(() => _account = a),
-                    avatar: BankLogo(bankKey: a.bank.key, size: 24),
-                    label: Text(a.bank.name),
-                  );
-                },
               ),
             ),
             const SizedBox(height: 16),
@@ -109,32 +160,28 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final UiCategory c in MockData.categories)
+                for (final UiCategory c in AppCategories.all)
                   ChoiceChip(
                     selected: c == _category,
                     onSelected: (_) => setState(() => _category = c),
                     avatar: Icon(c.icon, size: 18, color: c.color),
                     label: Text(c.name),
                   ),
-                ActionChip(
-                  avatar: Icon(Icons.add_rounded, size: 18, color: AppColors.transfer(theme.brightness)),
-                  label: const Text('دسته جدید'),
-                  onPressed: () {},
-                ),
               ],
             ),
             const SizedBox(height: 24),
             Row(
               children: [
                 IconButton.outlined(
-                  onPressed: () => Navigator.pop(context),
+                  tooltip: 'حذف تراکنش',
+                  onPressed: _delete,
                   color: scheme.error,
                   icon: const Icon(Icons.delete_outline_rounded),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _save,
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                     child: const Text('ذخیره تغییرات'),
                   ),

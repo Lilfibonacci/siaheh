@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:siaheh/core/utils/persian_format.dart';
-import 'package:siaheh/presentation/mock/mock_data.dart';
-import 'package:siaheh/presentation/mock/ui_models.dart';
+import 'package:siaheh/presentation/bloc/finance_bloc.dart';
+import 'package:siaheh/presentation/bloc/finance_event.dart';
+import 'package:siaheh/presentation/bloc/finance_state.dart';
+import 'package:siaheh/presentation/mapper/finance_mapper.dart';
+import 'package:siaheh/presentation/models/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/add_sender_sheet.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
 
-class SendersTab extends StatefulWidget {
+class SendersTab extends StatelessWidget {
   const SendersTab({super.key});
-
-  @override
-  State<SendersTab> createState() => _SendersTabState();
-}
-
-class _SendersTabState extends State<SendersTab> {
-  late final List<bool> _enabled = MockData.senders.map((s) => s.enabled).toList();
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
+    final FinanceState state = context.watch<FinanceBloc>().state;
+    final List<UiSender> senders = FinanceMapper(state).senders;
 
     return SafeArea(
       bottom: false,
@@ -27,7 +26,28 @@ class _SendersTabState extends State<SendersTab> {
           ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
             children: [
-              Text('منابع پیامک', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'منابع پیامک',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (state.hasPermission)
+                    OutlinedButton.icon(
+                      onPressed: state.syncing
+                          ? null
+                          : () => context.read<FinanceBloc>().add(
+                              const FinanceSyncRequested(fullRescan: true),
+                            ),
+                      icon: const Icon(Icons.radar_rounded, size: 18),
+                      label: const Text('اسکن کامل'),
+                    ),
+                ],
+              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -43,7 +63,7 @@ class _SendersTabState extends State<SendersTab> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'فقط پیامک فرستنده‌های فعال ذخیره می‌شود. همه‌ی پردازش‌ها روی گوشی شما انجام می‌شود.',
+                        'بانک‌های شما به صورت خودکار شناسایی می‌شوند و همه‌ی پردازش‌ها کاملاً آفلاین روی گوشی خودتان انجام می‌شود.',
                         style: theme.textTheme.bodySmall?.copyWith(height: 1.7),
                       ),
                     ),
@@ -51,11 +71,45 @@ class _SendersTabState extends State<SendersTab> {
                 ),
               ),
               const SizedBox(height: 16),
-              for (int i = 0; i < MockData.senders.length; i++)
+              if (!state.hasPermission)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: FilledButton.icon(
+                    onPressed: () => context.read<FinanceBloc>().add(
+                      const FinancePermissionRequested(),
+                    ),
+                    icon: const Icon(Icons.lock_open_rounded),
+                    label: const Text('دادن دسترسی به پیامک'),
+                  ),
+                ),
+              if (senders.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: Center(
+                    child: Text(
+                      'هنوز سرشماره بانکی شناسایی نشده است.\nدکمه «اسکن کامل» یا «افزودن سرشماره» را بزنید.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        height: 1.7,
+                        color: scheme.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                ),
+              for (final UiSender sender in senders)
                 _SenderTile(
-                  sender: MockData.senders[i],
-                  enabled: _enabled[i],
-                  onChanged: (v) => setState(() => _enabled[i] = v),
+                  sender: sender,
+                  enabled: sender.enabled,
+                  onChanged: (v) {
+                    final entity = state.senders
+                        .firstWhere((s) => s.number == sender.number);
+                    context.read<FinanceBloc>().add(
+                      FinanceSenderToggled(sender: entity, enabled: v),
+                    );
+                  },
+                  onDelete: () => context.read<FinanceBloc>().add(
+                    FinanceSenderDeleted(sender.number),
+                  ),
                 ),
             ],
           ),
@@ -75,11 +129,17 @@ class _SendersTabState extends State<SendersTab> {
 }
 
 class _SenderTile extends StatelessWidget {
-  const _SenderTile({required this.sender, required this.enabled, required this.onChanged});
+  const _SenderTile({
+    required this.sender,
+    required this.enabled,
+    required this.onChanged,
+    required this.onDelete,
+  });
 
   final UiSender sender;
   final bool enabled;
   final ValueChanged<bool> onChanged;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -102,18 +162,66 @@ class _SenderTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(sender.bank.name, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        sender.bank.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (sender.autoDetected) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'خودکار',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
                 const SizedBox(height: 4),
                 Text(
                   PersianFormat.digits(sender.number),
                   textDirection: TextDirection.ltr,
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurface.withValues(alpha: 0.55)),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurface.withValues(alpha: 0.55),
+                  ),
                 ),
                 Text(
-                  PersianFormat.digits('${sender.messageCount} پیامک در صندوق'),
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurface.withValues(alpha: 0.55)),
+                  PersianFormat.digits('${sender.messageCount} پیامک بانکی'),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurface.withValues(alpha: 0.55),
+                  ),
                 ),
               ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'حذف سرشماره',
+            visualDensity: VisualDensity.compact,
+            onPressed: onDelete,
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              size: 20,
+              color: scheme.onSurface.withValues(alpha: 0.5),
             ),
           ),
           Switch(value: enabled, onChanged: onChanged),

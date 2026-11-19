@@ -9,10 +9,11 @@ class PersianFormat {
   ];
 
   static final NumberFormat _grouped = NumberFormat('#,##0', 'en');
+  static final RegExp _latinDigit = RegExp(r'\d');
 
   /// Converts latin digits in [input] to Persian digits.
   static String digits(String input) => input.replaceAllMapped(
-    RegExp(r'\d'),
+    _latinDigit,
     (m) => _faDigits[int.parse(m[0]!)],
   );
 

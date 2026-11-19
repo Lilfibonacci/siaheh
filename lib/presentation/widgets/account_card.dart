@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:siaheh/core/utils/persian_format.dart';
-import 'package:siaheh/presentation/mock/ui_models.dart';
+import 'package:siaheh/presentation/models/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
 
 class AccountCard extends StatelessWidget {
   const AccountCard({super.key, required this.account});
+
+  static final RegExp _fourDigits = RegExp(r'^\d{4}$');
 
   final UiAccount account;
 
@@ -12,6 +14,10 @@ class AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
+    final bool isDigits = _fourDigits.hasMatch(account.last4);
+    final String subtitle = isDigits
+        ? 'حساب •••• ${PersianFormat.digits(account.last4)}'
+        : 'حساب ${PersianFormat.digits(account.last4)}';
 
     return Container(
       width: 200,
@@ -40,7 +46,9 @@ class AccountCard extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            'کارت •••• ${PersianFormat.digits(account.last4)}',
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: theme.textTheme.bodySmall?.copyWith(
               color: scheme.onSurface.withValues(alpha: 0.55),
             ),

@@ -1,7 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:siaheh/core/utils/persian_format.dart';
-import 'package:siaheh/presentation/mock/ui_models.dart';
+import 'package:siaheh/presentation/models/finance_ui_models.dart';
 
 /// Donut chart + legend of expenses per category.
 class ExpenseDonut extends StatelessWidget {
@@ -9,11 +9,27 @@ class ExpenseDonut extends StatelessWidget {
 
   final Map<UiCategory, int> data;
 
+  String _formatCompactToman(int totalRial) {
+    final int toman = totalRial.abs() ~/ 10;
+    if (toman >= 1000000) {
+      final double millions = toman / 1000000;
+      final String formatted = millions >= 10
+          ? millions.round().toString()
+          : millions.toStringAsFixed(1);
+      return '${PersianFormat.digits(formatted)} میلیون';
+    }
+    if (toman >= 1000) {
+      return '${PersianFormat.digits('${(toman / 1000).round()}')} هزار';
+    }
+    return PersianFormat.digits('$toman');
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
     final int total = data.values.fold(0, (a, b) => a + b);
+    if (total <= 0) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -56,7 +72,7 @@ class ExpenseDonut extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${PersianFormat.digits('${(total / 10000000).round()}')} میلیون',
+                      _formatCompactToman(total),
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                     ),
                   ],

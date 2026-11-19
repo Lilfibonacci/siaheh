@@ -1,0 +1,445 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:siaheh/core/utils/persian_format.dart';
+import 'package:siaheh/features/sms/domain/entities/bank_sms_message.dart';
+import 'package:siaheh/features/sms/domain/entities/iranian_bank_registry.dart';
+import 'package:siaheh/presentation/bloc/finance_bloc.dart';
+import 'package:siaheh/presentation/bloc/finance_event.dart';
+import 'package:siaheh/presentation/bloc/finance_state.dart';
+import 'package:siaheh/presentation/mapper/finance_mapper.dart';
+import 'package:siaheh/presentation/models/finance_ui_models.dart';
+import 'package:siaheh/presentation/widgets/bank_logo.dart';
+import 'package:siaheh/presentation/widgets/transaction_edit_sheet.dart';
+
+/// Dedicated inbox tab displaying ALL detected bank SMS across all banks
+/// (transactions, info alerts, OTPs, and unparsed financial messages).
+class BankMessagesTab extends StatefulWidget {
+  const BankMessagesTab({super.key});
+
+  @override
+  State<BankMessagesTab> createState() => _BankMessagesTabState();
+}
+
+class _BankMessagesTabState extends State<BankMessagesTab> {
+  String? _selectedBankKey;
+  BankSmsKind? _selectedKind;
+  bool _searching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<BankSmsMessage> _filtered(List<BankSmsMessage> all) {
+    final query = _searchController.text.trim().toLowerCase();
+    return all.where((m) {
+      if (_selectedBankKey != null && m.bankKey != _selectedBankKey) {
+        return false;
+      }
+      if (_selectedKind != null && m.kind != _selectedKind) {
+        return false;
+      }
+      if (query.isNotEmpty) {
+        final inBody = m.body.toLowerCase().contains(query);
+        final inBank =
+            IranianBankRegistry.byKey(m.bankKey).name.toLowerCase().contains(query);
+        final inSender = m.senderAddress.toLowerCase().contains(query);
+        if (!inBody && !inBank && !inSender) return false;
+      }
+      return true;
+    }).toList(growable: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final FinanceState state = context.watch<FinanceBloc>().state;
+    final FinanceMapper mapper = FinanceMapper(state);
+    final List<BankSmsMessage> allMessages = mapper.activeBankMessages;
+    final List<UiBank> banks = mapper.detectedBanks;
+    final List<BankSmsMessage> items = _filtered(allMessages);
+
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'پیامک‌های بانکی',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        PersianFormat.digits(
+                          '${allMessages.length} پیامک از ${banks.length} بانک',
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurface.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.outlined(
+                  tooltip: 'جستجو',
+                  onPressed: () {
+                    setState(() {
+                      _searching = !_searching;
+                      if (!_searching) _searchController.clear();
+                    });
+                  },
+                  icon: Icon(
+                    _searching ? Icons.close_rounded : Icons.search_rounded,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.outlined(
+                  tooltip: 'بروزرسانی پیامک‌ها',
+                  onPressed: state.syncing
+                      ? null
+                      : () => context.read<FinanceBloc>().add(
+                          const FinanceSyncRequested(),
+                        ),
+                  icon: state.syncing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            ),
+          ),
+          if (_searching)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+              child: TextField(
+                controller: _searchController,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'جستجو در متن پیامک، نام بانک یا سرشماره...',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          if (banks.length > 1)
+            SizedBox(
+              height: 52,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: ChoiceChip(
+                      label: Text(
+                        PersianFormat.digits('همه بانک‌ها (${allMessages.length})'),
+                      ),
+                      selected: _selectedBankKey == null,
+                      onSelected: (_) => setState(() => _selectedBankKey = null),
+                    ),
+                  ),
+                  for (final UiBank b in banks)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: ChoiceChip(
+                        avatar: BankLogo(bankKey: b.key, size: 22),
+                        label: Text(
+                          PersianFormat.digits(
+                            '${b.name} (${mapper.messageCountForBank(b.key)})',
+                          ),
+                        ),
+                        selected: _selectedBankKey == b.key,
+                        onSelected: (_) => setState(() => _selectedBankKey = b.key),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          SizedBox(
+            height: 48,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              children: [
+                _KindChip(
+                  label: 'همه',
+                  selected: _selectedKind == null,
+                  onTap: () => setState(() => _selectedKind = null),
+                ),
+                _KindChip(
+                  label: 'تراکنش',
+                  selected: _selectedKind == BankSmsKind.transaction,
+                  onTap: () =>
+                      setState(() => _selectedKind = BankSmsKind.transaction),
+                ),
+                _KindChip(
+                  label: 'اطلاع‌رسانی',
+                  selected: _selectedKind == BankSmsKind.info,
+                  onTap: () => setState(() => _selectedKind = BankSmsKind.info),
+                ),
+                _KindChip(
+                  label: 'رمز پویا',
+                  selected: _selectedKind == BankSmsKind.otp,
+                  onTap: () => setState(() => _selectedKind = BankSmsKind.otp),
+                ),
+                _KindChip(
+                  label: 'پارس‌نشده',
+                  selected: _selectedKind == BankSmsKind.unparsed,
+                  onTap: () =>
+                      setState(() => _selectedKind = BankSmsKind.unparsed),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: !state.hasPermission
+                ? _PermissionEmptyState(
+                    onGrant: () => context.read<FinanceBloc>().add(
+                      const FinancePermissionRequested(),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<FinanceBloc>().add(
+                        const FinanceSyncRequested(),
+                      );
+                    },
+                    child: items.isEmpty
+                        ? ListView(
+                            children: [
+                              const SizedBox(height: 80),
+                              Center(
+                                child: Text(
+                                  'پیامک بانکی با این فیلتر یافت نشد',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: scheme.onSurface.withValues(alpha: 0.55),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                            itemCount: items.length,
+                            itemBuilder: (_, i) {
+                              final UiBankMessage msg =
+                                  mapper.toUiMessage(items[i]);
+                              final bool hasLinkedTx =
+                                  msg.transactionId != null &&
+                                  mapper.transactionUiById(msg.transactionId) !=
+                                      null;
+                              return _BankMessageCard(
+                                message: msg,
+                                onOpenTransaction: !hasLinkedTx
+                                    ? null
+                                    : () {
+                                        final tx = mapper.transactionUiById(
+                                          msg.transactionId,
+                                        );
+                                        if (tx != null) {
+                                          showTransactionEditSheet(context, tx);
+                                        }
+                                      },
+                              );
+                            },
+                          ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KindChip extends StatelessWidget {
+  const _KindChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+      ),
+    );
+  }
+}
+
+class _BankMessageCard extends StatelessWidget {
+  const _BankMessageCard({
+    required this.message,
+    this.onOpenTransaction,
+  });
+
+  final UiBankMessage message;
+  final VoidCallback? onOpenTransaction;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+
+    final (String kindLabel, Color kindColor) = switch (message.kind) {
+      BankSmsKind.transaction => ('تراکنش', scheme.secondary),
+      BankSmsKind.otp => ('رمز پویا', Colors.orange),
+      BankSmsKind.info => ('اطلاع‌رسانی', scheme.primary),
+      BankSmsKind.unparsed => ('پارس‌نشده', scheme.error),
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              BankLogo(bankKey: message.bank.key, size: 36),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message.bank.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      PersianFormat.digits(
+                        '${message.senderAddress} • ${message.dateLabel} ${message.timeLabel}',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurface.withValues(alpha: 0.55),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kindColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  kindLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kindColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SelectableText(
+            message.body,
+            style: theme.textTheme.bodySmall?.copyWith(height: 1.7),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (onOpenTransaction != null)
+                TextButton.icon(
+                  onPressed: onOpenTransaction,
+                  icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                  label: const Text('مشاهده تراکنش'),
+                ),
+              IconButton(
+                tooltip: 'کپی متن پیامک',
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: message.body));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('متن پیامک کپی شد'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_rounded, size: 18),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PermissionEmptyState extends StatelessWidget {
+  const _PermissionEmptyState({required this.onGrant});
+
+  final VoidCallback onGrant;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.sms_outlined,
+              size: 48,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'برای نمایش خودکار پیامک‌های بانک‌ها، دسترسی خواندن پیامک را فعال کنید.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onGrant,
+              icon: const Icon(Icons.lock_open_rounded),
+              label: const Text('دادن دسترسی به پیامک'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

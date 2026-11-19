@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:siaheh/core/theme/app_colors.dart';
 import 'package:siaheh/core/utils/persian_format.dart';
-import 'package:siaheh/presentation/mock/ui_models.dart';
+import 'package:siaheh/presentation/models/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
 
 class TransactionTile extends StatelessWidget {
@@ -67,7 +67,7 @@ class TransactionTile extends StatelessWidget {
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
-                            '${tx.category.name} • ${tx.timeLabel}',
+                            '${tx.account.bank.name} • ${tx.category.name} • ${tx.timeLabel}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodySmall?.copyWith(
