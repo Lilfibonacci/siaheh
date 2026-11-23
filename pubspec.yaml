@@ -29,6 +29,7 @@ dependencies:
   flutter_svg: ^2.3.0
   another_telephony: ^0.4.1
   permission_handler: ^13.0.2
+  liquid_glass_widgets: ^1.20.0
 
 dev_dependencies:
   flutter_test:

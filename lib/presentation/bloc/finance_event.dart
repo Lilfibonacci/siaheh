@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_sms_message.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_transaction.dart';
+import 'package:siaheh/features/sms/domain/entities/custom_category.dart';
 import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
 
 /// All events handled by [FinanceBloc].
@@ -81,13 +82,19 @@ final class FinanceSenderDeleted extends FinanceEvent {
 }
 
 /// User edits a parsed transaction (type, amount, title, category).
+/// When [applyToSimilar] is `true`, learns a rule for future transactions and
+/// applies the category to matching unedited transactions.
 final class FinanceTransactionUpdated extends FinanceEvent {
-  const FinanceTransactionUpdated(this.transaction);
+  const FinanceTransactionUpdated(
+    this.transaction, {
+    this.applyToSimilar = false,
+  });
 
   final BankTransaction transaction;
+  final bool applyToSimilar;
 
   @override
-  List<Object?> get props => [transaction];
+  List<Object?> get props => [transaction, applyToSimilar];
 }
 
 /// User deletes a parsed transaction.
@@ -98,4 +105,24 @@ final class FinanceTransactionDeleted extends FinanceEvent {
 
   @override
   List<Object?> get props => [id];
+}
+
+/// User creates a custom category.
+final class FinanceCustomCategoryAdded extends FinanceEvent {
+  const FinanceCustomCategoryAdded(this.category);
+
+  final CustomCategory category;
+
+  @override
+  List<Object?> get props => [category];
+}
+
+/// User deletes a custom category.
+final class FinanceCustomCategoryDeleted extends FinanceEvent {
+  const FinanceCustomCategoryDeleted(this.name);
+
+  final String name;
+
+  @override
+  List<Object?> get props => [name];
 }

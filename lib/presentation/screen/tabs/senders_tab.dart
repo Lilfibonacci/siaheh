@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/core/utils/persian_format.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
 import 'package:siaheh/presentation/bloc/finance_event.dart';
@@ -24,7 +26,7 @@ class SendersTab extends StatelessWidget {
       child: Stack(
         children: [
           ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 176),
             children: [
               Row(
                 children: [
@@ -37,24 +39,48 @@ class SendersTab extends StatelessWidget {
                     ),
                   ),
                   if (state.hasPermission)
-                    OutlinedButton.icon(
-                      onPressed: state.syncing
-                          ? null
-                          : () => context.read<FinanceBloc>().add(
-                              const FinanceSyncRequested(fullRescan: true),
+                    GlassButton.custom(
+                      useOwnLayer: true,
+                      height: 40,
+                      stretch: 0.15,
+                      enabled: !state.syncing,
+                      shape: const LiquidRoundedSuperellipse(borderRadius: 20),
+                      label: 'اسکن کامل',
+                      onTap: () => context.read<FinanceBloc>().add(
+                        const FinanceSyncRequested(fullRescan: true),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.radar_rounded,
+                              size: 18,
+                              color: scheme.primary,
                             ),
-                      icon: const Icon(Icons.radar_rounded, size: 18),
-                      label: const Text('اسکن کامل'),
+                            const SizedBox(width: 6),
+                            Text(
+                              'اسکن کامل',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                 ],
               ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: scheme.primary.withValues(alpha: 0.35)),
+                decoration: SiahehGlass.frostedRowDecoration(
+                  context,
+                  radius: 18,
+                  tintColor: scheme.primary,
+                  borderColor: scheme.primary.withValues(alpha: 0.35),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,11 +141,32 @@ class SendersTab extends StatelessWidget {
           ),
           Positioned(
             left: 20,
-            bottom: 20,
-            child: FloatingActionButton.extended(
-              onPressed: () => showAddSenderSheet(context),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('افزودن سرشماره'),
+            bottom: 102,
+            child: GlassButton.custom(
+              useOwnLayer: true,
+              height: 52,
+              shape: const LiquidRoundedSuperellipse(borderRadius: 26),
+              tintColor: scheme.primary.withValues(alpha: 0.24),
+              glowColor: scheme.primary.withValues(alpha: 0.35),
+              label: 'افزودن سرشماره',
+              onTap: () => showAddSenderSheet(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_rounded, size: 22, color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'افزودن سرشماره',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -145,15 +192,12 @@ class _SenderTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outline),
-      ),
+      decoration: SiahehGlass.frostedRowDecoration(context, radius: 20),
       child: Row(
         children: [
           BankLogo(bankKey: sender.bank.key, size: 46),
@@ -182,7 +226,7 @@ class _SenderTile extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: scheme.primary.withValues(alpha: 0.14),
+                          color: scheme.primary.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -202,13 +246,13 @@ class _SenderTile extends StatelessWidget {
                   PersianFormat.digits(sender.number),
                   textDirection: TextDirection.ltr,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.55),
+                    color: scheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 Text(
                   PersianFormat.digits('${sender.messageCount} پیامک بانکی'),
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.55),
+                    color: scheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -221,10 +265,22 @@ class _SenderTile extends StatelessWidget {
             icon: Icon(
               Icons.delete_outline_rounded,
               size: 20,
-              color: scheme.onSurface.withValues(alpha: 0.5),
+              color: scheme.onSurface.withValues(alpha: 0.55),
             ),
           ),
-          Switch(value: enabled, onChanged: onChanged),
+          const SizedBox(width: 4),
+          GlassSwitch(
+            useOwnLayer: true,
+            value: enabled,
+            onChanged: onChanged,
+            width: 54,
+            height: 28,
+            activeColor: scheme.secondary,
+            inactiveColor: isDark
+                ? Colors.white.withValues(alpha: 0.18)
+                : Colors.black.withValues(alpha: 0.14),
+            semanticLabel: sender.bank.name,
+          ),
         ],
       ),
     );

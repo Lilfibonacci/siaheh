@@ -53,9 +53,53 @@ class AppTheme {
       ),
 
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.lightSurface,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+
+      chipTheme: ChipThemeData(
+        backgroundColor: Colors.white.withValues(alpha: 0.72),
+        selectedColor: AppColors.goldLightTheme.withValues(alpha: 0.18),
+        side: BorderSide(color: AppColors.lightBorder.withValues(alpha: 0.9)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        labelStyle: const TextStyle(
+          color: AppColors.lightTextPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          fontFamily: AppFonts.family,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: AppColors.goldLightTheme,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          fontFamily: AppFonts.family,
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.68),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: AppColors.lightBorder.withValues(alpha: 0.9),
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: AppColors.lightBorder.withValues(alpha: 0.9),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: AppColors.goldLightTheme,
+            width: 1.5,
+          ),
         ),
       ),
 
@@ -113,9 +157,49 @@ class AppTheme {
       ),
 
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.darkSurface,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+      ),
+
+      chipTheme: ChipThemeData(
+        backgroundColor: Colors.white.withValues(alpha: 0.06),
+        selectedColor: AppColors.goldDarkTheme.withValues(alpha: 0.22),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        labelStyle: const TextStyle(
+          color: AppColors.darkTextPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          fontFamily: AppFonts.family,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          color: AppColors.goldDarkTheme,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          fontFamily: AppFonts.family,
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.06),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(
+            color: AppColors.goldDarkTheme,
+            width: 1.5,
+          ),
         ),
       ),
 

@@ -1,18 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
 import 'package:siaheh/presentation/bloc/finance_event.dart';
 import 'package:siaheh/presentation/widgets/bank_icon_resolver.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
 
-/// Bottom sheet to manually register a numeric or alphanumeric bank SMS sender.
+/// Liquid Glass bottom sheet to manually register a numeric or alphanumeric
+/// bank SMS sender.
 Future<void> showAddSenderSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  final ThemeData capturedTheme = Theme.of(context);
+  final FinanceBloc capturedBloc = context.read<FinanceBloc>();
+
+  return GlassSheet.show<void>(
     context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (_) => const _AddSenderSheet(),
+    settings: SiahehGlass.sheetSettings(capturedTheme.brightness),
+    topBorderRadius: 34,
+    margin: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+    isScrollable: true,
+    interactionScale: 1.0,
+    stretch: 0.12,
+    enableInteractionGlow: false,
+    enableSaturationGlow: false,
+    suppressInteractionOnChildren: true,
+    dragIndicatorColor: capturedTheme.colorScheme.onSurface.withValues(
+      alpha: 0.28,
+    ),
+    builder: (_) => BlocProvider.value(
+      value: capturedBloc,
+      child: Theme(
+        data: capturedTheme,
+        child: const Directionality(
+          textDirection: TextDirection.rtl,
+          child: Material(
+            type: MaterialType.transparency,
+            child: _AddSenderSheet(),
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -44,13 +72,12 @@ class _AddSenderSheetState extends State<_AddSenderSheet> {
         20,
         0,
         20,
-        MediaQuery.viewInsetsOf(context).bottom + 20,
+        MediaQuery.viewInsetsOf(context).bottom + 12,
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Text('افزودن سرشماره بانک', style: theme.textTheme.titleLarge),
             const SizedBox(height: 6),
             Text(
@@ -112,12 +139,14 @@ class _AddSenderSheetState extends State<_AddSenderSheet> {
                     },
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(52),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
               ),
               child: const Text('افزودن'),
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }

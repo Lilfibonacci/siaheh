@@ -10,9 +10,10 @@ import 'package:siaheh/presentation/models/finance_ui_models.dart';
 
 /// O(N)-indexed mapper from [FinanceState] into presentation view models.
 ///
-/// Automatically hides items belonging to user-disabled senders and caches
-/// derived lookups (`_accountsByKey`, `_txById`, `_messageCountsByBankKey`) so
-/// widgets never perform quadratic scans during build.
+/// Automatically hides items belonging to user-disabled senders, folds
+/// fallback `'اصلی'` accounts into a bank's real numbered account, merges
+/// user custom categories, and caches derived lookups so widgets never perform
+/// quadratic scans during build.
 class FinanceMapper {
   FinanceMapper(this.state);
 
@@ -27,7 +28,12 @@ class FinanceMapper {
     return UiBank(key: info.key, name: info.name);
   }
 
-  static UiCategory categoryOf(String? id) => AppCategories.byName(id);
+  /// Built-in + user-created custom categories.
+  late final List<UiCategory> allCategories =
+      AppCategories.mergeWithCustom(state.customCategories);
+
+  UiCategory categoryOf(String? id) =>
+      AppCategories.byName(id, custom: state.customCategories);
 
   String get currentJalaliMonthLabel =>
       PersianFormat.digits('${_nowJalali.formatter.mN} ${_nowJalali.year}');
@@ -92,7 +98,6 @@ class FinanceMapper {
 
     for (final t in activeTransactions) {
       final k = _canonicalAccountKey(t);
-      // Prefer a real numbered transaction as the representative for display suffix.
       final existing = latestByKey[k];
       if (existing == null ||
           (existing.accountNumber == GenericSmsParser.defaultAccountLabel &&
@@ -139,7 +144,7 @@ class FinanceMapper {
     return tx == null ? null : toUi(tx);
   }
 
-  /// All distinct accounts across all banks, keyed by `(bankKey, accountNumber)`.
+  /// All distinct accounts across all banks, keyed by canonical account key.
   late final List<UiAccount> accounts =
       _accountsByKey.values.toList(growable: false);
 
@@ -195,6 +200,7 @@ class FinanceMapper {
       dateLabel: dateLabel,
       timeLabel: timeLabel,
       rawBody: t.rawBody,
+      merchantName: t.merchantName,
       needsReview: t.needsReview,
       isAutoTransfer: t.linkedTransferId != null,
     );
@@ -217,20 +223,54 @@ class FinanceMapper {
     );
   }
 
-  late final List<BankTransaction> _thisMonth = () {
-    // Only transactions within the last ~35 days can belong to the current
-    // Jalali month, avoiding Jalali conversion on years of older transactions.
-    final cutoff = _now.subtract(const Duration(days: 35));
+  List<BankTransaction> transactionsInFilter(JalaliDateFilter filter) {
+    if (!filter.isActive) return activeTransactions;
+    final (start, end) = filter.bounds(now: _now);
     final list = <BankTransaction>[];
     for (final t in activeTransactions) {
-      if (t.occurredAt.isBefore(cutoff)) continue;
-      final j = Jalali.fromDateTime(t.occurredAt);
-      if (j.year == _nowJalali.year && j.month == _nowJalali.month) {
-        list.add(t);
-      }
+      if (start != null && t.occurredAt.isBefore(start)) continue;
+      if (end != null && !t.occurredAt.isBefore(end)) continue;
+      list.add(t);
     }
     return list;
+  }
+
+  /// Counts of active expense transactions grouped by Jalali `{year: {month: count}}`.
+  late final Map<int, Map<int, int>> expenseCountsByYearMonth = () {
+    final map = <int, Map<int, int>>{};
+    for (final t in activeTransactions) {
+      if (t.type != TransactionType.expense) continue;
+      final j = Jalali.fromDateTime(t.occurredAt);
+      final months = map.putIfAbsent(j.year, () => <int, int>{});
+      months[j.month] = (months[j.month] ?? 0) + 1;
+    }
+    return map;
   }();
+
+  /// Counts of all active transactions grouped by Jalali `{year: {month: count}}`.
+  late final Map<int, Map<int, int>> transactionCountsByYearMonth = () {
+    final map = <int, Map<int, int>>{};
+    for (final t in activeTransactions) {
+      final j = Jalali.fromDateTime(t.occurredAt);
+      final months = map.putIfAbsent(j.year, () => <int, int>{});
+      months[j.month] = (months[j.month] ?? 0) + 1;
+    }
+    return map;
+  }();
+
+  /// Counts of active bank messages grouped by Jalali `{year: {month: count}}`.
+  late final Map<int, Map<int, int>> messageCountsByYearMonth = () {
+    final map = <int, Map<int, int>>{};
+    for (final m in activeBankMessages) {
+      final j = Jalali.fromDateTime(m.receivedAt);
+      final months = map.putIfAbsent(j.year, () => <int, int>{});
+      months[j.month] = (months[j.month] ?? 0) + 1;
+    }
+    return map;
+  }();
+
+  late final List<BankTransaction> _thisMonth =
+      transactionsInFilter(JalaliDateFilter.thisMonth(_now));
 
   /// Monthly income excluding internal transfers.
   late final int monthIncome = _thisMonth
@@ -242,21 +282,37 @@ class FinanceMapper {
       .where((t) => t.type == TransactionType.expense)
       .fold(0, (s, t) => s + t.amountRial);
 
-  late final Map<UiCategory, int> expenseByCategory = () {
-    final map = <UiCategory, int>{};
-    for (final t in _thisMonth) {
+  /// Aggregated expense slices for [filter], sorted largest-first.
+  List<CategoryExpenseSlice> expenseBreakdown(JalaliDateFilter filter) {
+    final txs = transactionsInFilter(filter);
+    final amounts = <UiCategory, int>{};
+    final counts = <UiCategory, int>{};
+    var total = 0;
+
+    for (final t in txs) {
       if (t.type != TransactionType.expense) continue;
-      map.update(
-        categoryOf(t.categoryId),
-        (v) => v + t.amountRial,
-        ifAbsent: () => t.amountRial,
-      );
+      final cat = categoryOf(t.categoryId);
+      amounts[cat] = (amounts[cat] ?? 0) + t.amountRial;
+      counts[cat] = (counts[cat] ?? 0) + 1;
+      total += t.amountRial;
     }
-    return map;
-  }();
+
+    if (total <= 0) return const [];
+
+    final slices = [
+      for (final e in amounts.entries)
+        CategoryExpenseSlice(
+          category: e.key,
+          amountRial: e.value,
+          transactionCount: counts[e.key] ?? 0,
+          percentage: (e.value * 100.0) / total,
+        ),
+    ]..sort((a, b) => b.amountRial.compareTo(a.amountRial));
+
+    return slices;
+  }
 
   late final List<UiSender> senders = () {
-    // Count messages by canonical sender address in one O(M) pass.
     final countsByCanonical = <String, int>{};
     for (final m in state.bankMessages) {
       final canonical = SmsSender.canonicalAddress(m.senderAddress);
@@ -285,7 +341,9 @@ class FinanceMapper {
       dateLabel = 'دیروز';
     } else {
       final j = Jalali.fromDateTime(dt);
-      dateLabel = '${j.day} ${j.formatter.mN}';
+      dateLabel = j.year == _nowJalali.year
+          ? '${j.day} ${j.formatter.mN}'
+          : '${j.day} ${j.formatter.mN} ${j.year}';
     }
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');

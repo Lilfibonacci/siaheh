@@ -17,6 +17,7 @@ class BankTransaction extends Equatable {
     this.balanceRial,
     this.categoryId,
     this.title,
+    this.merchantName,
     this.needsReview = false,
     this.linkedTransferId,
     this.userEdited = false,
@@ -43,6 +44,10 @@ class BankTransaction extends Equatable {
   final int? balanceRial;
   final String? categoryId;
   final String? title;
+
+  /// Merchant / acceptor name extracted from either a correlated OTP SMS or
+  /// the transaction SMS body (e.g. `ایرانسل`, `اسنپ`, `دیجی‌کالا`).
+  final String? merchantName;
   final bool needsReview;
 
   /// When this transaction is paired as an internal transfer between two of
@@ -50,7 +55,7 @@ class BankTransaction extends Equatable {
   final String? linkedTransferId;
 
   /// True after the user manually edits this transaction, so auto-transfer
-  /// detection does not override their choice.
+  /// detection and auto-categorization do not override their choice.
   final bool userEdited;
 
   static final RegExp _nonDigit = RegExp(r'\D');
@@ -73,6 +78,7 @@ class BankTransaction extends Equatable {
     int? amountRial,
     String? categoryId,
     String? title,
+    String? merchantName,
     bool? needsReview,
     String? linkedTransferId,
     bool clearLinkedTransfer = false,
@@ -90,6 +96,7 @@ class BankTransaction extends Equatable {
     balanceRial: balanceRial,
     categoryId: categoryId ?? this.categoryId,
     title: title ?? this.title,
+    merchantName: merchantName ?? this.merchantName,
     needsReview: needsReview ?? this.needsReview,
     linkedTransferId: clearLinkedTransfer
         ? null
@@ -110,6 +117,7 @@ class BankTransaction extends Equatable {
     'balanceRial': balanceRial,
     'categoryId': categoryId,
     'title': title,
+    'merchantName': merchantName,
     'needsReview': needsReview,
     'linkedTransferId': linkedTransferId,
     'userEdited': userEdited,
@@ -128,6 +136,7 @@ class BankTransaction extends Equatable {
     balanceRial: m['balanceRial'] as int?,
     categoryId: m['categoryId'] as String?,
     title: m['title'] as String?,
+    merchantName: m['merchantName'] as String?,
     needsReview: m['needsReview'] as bool? ?? false,
     linkedTransferId: m['linkedTransferId'] as String?,
     userEdited: m['userEdited'] as bool? ?? false,
@@ -146,6 +155,7 @@ class BankTransaction extends Equatable {
     balanceRial,
     categoryId,
     title,
+    merchantName,
     needsReview,
     linkedTransferId,
     userEdited,

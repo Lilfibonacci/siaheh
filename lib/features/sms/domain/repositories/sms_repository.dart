@@ -3,6 +3,8 @@ import 'package:equatable/equatable.dart';
 import 'package:siaheh/core/error/failure.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_sms_message.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_transaction.dart';
+import 'package:siaheh/features/sms/domain/entities/category_rule.dart';
+import 'package:siaheh/features/sms/domain/entities/custom_category.dart';
 import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
 
 /// Summary of an inbox sync pass.
@@ -30,7 +32,15 @@ class SyncResult extends Equatable {
 
 abstract interface class SmsRepository {
   Future<Either<Failure, List<BankTransaction>>> getTransactions();
-  Future<Either<Failure, Unit>> updateTransaction(BankTransaction tx);
+
+  /// Saves an edited transaction. When [applyToSimilar] is `true`, also learns
+  /// a [CategoryRule] from its merchant/title and applies the category to all
+  /// matching unedited transactions.
+  Future<Either<Failure, Unit>> updateTransaction(
+    BankTransaction tx, {
+    bool applyToSimilar = false,
+  });
+
   Future<Either<Failure, Unit>> deleteTransaction(String id);
 
   Future<Either<Failure, List<BankSmsMessage>>> getBankMessages();
@@ -39,10 +49,16 @@ abstract interface class SmsRepository {
   Future<Either<Failure, Unit>> saveSender(SmsSender sender);
   Future<Either<Failure, Unit>> deleteSender(String number);
 
+  Future<Either<Failure, List<CustomCategory>>> getCustomCategories();
+  Future<Either<Failure, Unit>> saveCustomCategory(CustomCategory category);
+  Future<Either<Failure, Unit>> deleteCustomCategory(String name);
+
+  Future<Either<Failure, List<CategoryRule>>> getCategoryRules();
+
   /// Reads the SMS inbox (incrementally by default, or full inbox when
   /// [fullRescan] is `true`), detects bank messages across all banks, stores
-  /// both raw bank messages and parsed transactions, and detects internal
-  /// transfers between user accounts.
+  /// both raw bank messages and parsed transactions, links internal transfers,
+  /// and auto-categorizes expenses using OTP correlation + rules.
   Future<Either<Failure, SyncResult>> syncInbox({bool fullRescan = false});
 
   /// Emits whenever a new bank SMS arrives while the app is in foreground.

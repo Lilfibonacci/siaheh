@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/core/utils/persian_format.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_sms_message.dart';
 import 'package:siaheh/features/sms/domain/entities/iranian_bank_registry.dart';
@@ -10,6 +12,7 @@ import 'package:siaheh/presentation/bloc/finance_state.dart';
 import 'package:siaheh/presentation/mapper/finance_mapper.dart';
 import 'package:siaheh/presentation/models/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
+import 'package:siaheh/presentation/widgets/jalali_period_picker.dart';
 import 'package:siaheh/presentation/widgets/transaction_edit_sheet.dart';
 
 /// Dedicated inbox tab displaying ALL detected bank SMS across all banks
@@ -24,6 +27,7 @@ class BankMessagesTab extends StatefulWidget {
 class _BankMessagesTabState extends State<BankMessagesTab> {
   String? _selectedBankKey;
   BankSmsKind? _selectedKind;
+  JalaliDateFilter _dateFilter = const JalaliDateFilter.all();
   bool _searching = false;
   final TextEditingController _searchController = TextEditingController();
 
@@ -33,9 +37,30 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
     super.dispose();
   }
 
+  Future<void> _openDateFilterPicker(FinanceMapper mapper) async {
+    final JalaliDateFilter? picked = await showJalaliPeriodPickerSheet(
+      context: context,
+      title: 'فیلتر زمانی پیامک‌ها',
+      initialFilter: _dateFilter,
+      countsByYearMonth: mapper.messageCountsByYearMonth,
+      allowAll: true,
+      allowWholeYear: true,
+      allowQuickRanges: true,
+      itemUnitLabel: 'پیامک',
+    );
+    if (picked != null && mounted) {
+      setState(() => _dateFilter = picked);
+    }
+  }
+
   List<BankSmsMessage> _filtered(List<BankSmsMessage> all) {
     final query = _searchController.text.trim().toLowerCase();
+    final (DateTime? start, DateTime? end) = _dateFilter.bounds();
+
     return all.where((m) {
+      if (start != null && m.receivedAt.isBefore(start)) return false;
+      if (end != null && !m.receivedAt.isBefore(end)) return false;
+
       if (_selectedBankKey != null && m.bankKey != _selectedBankKey) {
         return false;
       }
@@ -62,6 +87,13 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
     final List<BankSmsMessage> allMessages = mapper.activeBankMessages;
     final List<UiBank> banks = mapper.detectedBanks;
     final List<BankSmsMessage> items = _filtered(allMessages);
+    final String subtitle = _dateFilter.isActive
+        ? PersianFormat.digits(
+            '${items.length} از ${allMessages.length} پیامک • ${_dateFilter.label}',
+          )
+        : PersianFormat.digits(
+            '${allMessages.length} پیامک از ${banks.length} بانک',
+          );
 
     return SafeArea(
       bottom: false,
@@ -83,43 +115,81 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
                         ),
                       ),
                       Text(
-                        PersianFormat.digits(
-                          '${allMessages.length} پیامک از ${banks.length} بانک',
-                        ),
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurface.withValues(alpha: 0.55),
+                          color: scheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                     ],
                   ),
                 ),
-                IconButton.outlined(
-                  tooltip: 'جستجو',
-                  onPressed: () {
-                    setState(() {
-                      _searching = !_searching;
-                      if (!_searching) _searchController.clear();
-                    });
-                  },
-                  icon: Icon(
-                    _searching ? Icons.close_rounded : Icons.search_rounded,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.outlined(
-                  tooltip: 'بروزرسانی پیامک‌ها',
-                  onPressed: state.syncing
-                      ? null
-                      : () => context.read<FinanceBloc>().add(
+                AdaptiveLiquidGlassLayer(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GlassButton.custom(
+                        width: 42,
+                        height: 42,
+                        stretch: 0.15,
+                        label: 'فیلتر زمانی',
+                        onTap: () => _openDateFilterPicker(mapper),
+                        child: Icon(
+                          Icons.calendar_month_rounded,
+                          size: 20,
+                          color: _dateFilter.isActive
+                              ? scheme.primary
+                              : scheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GlassButton.custom(
+                        width: 42,
+                        height: 42,
+                        stretch: 0.15,
+                        label: _searching ? 'بستن جستجو' : 'جستجو',
+                        onTap: () {
+                          setState(() {
+                            _searching = !_searching;
+                            if (!_searching) _searchController.clear();
+                          });
+                        },
+                        child: Icon(
+                          _searching
+                              ? Icons.close_rounded
+                              : Icons.search_rounded,
+                          size: 20,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      GlassButton.custom(
+                        width: 42,
+                        height: 42,
+                        stretch: 0.15,
+                        enabled: !state.syncing,
+                        label: 'بروزرسانی پیامک‌ها',
+                        onTap: () => context.read<FinanceBloc>().add(
                           const FinanceSyncRequested(),
                         ),
-                  icon: state.syncing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh_rounded),
+                        child: state.syncing
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: scheme.primary,
+                                ),
+                              )
+                            : Icon(
+                                Icons.refresh_rounded,
+                                size: 20,
+                                color: scheme.onSurface,
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -176,11 +246,21 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
               ),
             ),
           SizedBox(
-            height: 48,
+            height: 52,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               children: [
+                JalaliDateFilterChip(
+                  filter: _dateFilter,
+                  onTap: () => _openDateFilterPicker(mapper),
+                  onClear: _dateFilter.isActive
+                      ? () => setState(
+                          () => _dateFilter = const JalaliDateFilter.all(),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 8),
                 _KindChip(
                   label: 'همه',
                   selected: _selectedKind == null,
@@ -239,7 +319,12 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
                             ],
                           )
                         : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                            padding: const EdgeInsets.fromLTRB(
+                              20,
+                              8,
+                              20,
+                              SiahehGlass.floatingNavBottomInset,
+                            ),
                             itemCount: items.length,
                             itemBuilder: (_, i) {
                               final UiBankMessage msg =
@@ -319,11 +404,7 @@ class _BankMessageCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outline),
-      ),
+      decoration: SiahehGlass.frostedRowDecoration(context, radius: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

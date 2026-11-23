@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:siaheh/core/di/injection_container.dart';
 import 'package:siaheh/core/router/app_global_router.dart';
 import 'package:siaheh/core/theme/app_theme.dart';
+import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
 import 'package:siaheh/presentation/bloc/finance_event.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LiquidGlassWidgets.initialize();
   await configureDependencies();
-  runApp(const MyApp());
+  runApp(
+    LiquidGlassWidgets.wrap(
+      adaptiveQuality: true,
+      brightnessResolver: Theme.maybeBrightnessOf,
+      theme: SiahehGlass.themeData,
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {

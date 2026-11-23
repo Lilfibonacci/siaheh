@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
 import 'package:siaheh/presentation/bloc/finance_event.dart';
 import 'package:siaheh/presentation/bloc/finance_state.dart';
@@ -8,19 +10,53 @@ import 'package:siaheh/presentation/models/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/account_card.dart';
 import 'package:siaheh/presentation/widgets/balance_header_card.dart';
 import 'package:siaheh/presentation/widgets/expense_donut.dart';
+import 'package:siaheh/presentation/widgets/jalali_period_picker.dart';
 import 'package:siaheh/presentation/widgets/section_header.dart';
 import 'package:siaheh/presentation/widgets/transaction_edit_sheet.dart';
 import 'package:siaheh/presentation/widgets/transaction_tile.dart';
 
-class HomeTab extends StatelessWidget {
+class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
     required this.onSeeAllTransactions,
     required this.onSeeAllMessages,
+    required this.onCategorySelected,
   });
 
   final VoidCallback onSeeAllTransactions;
   final VoidCallback onSeeAllMessages;
+  final void Function(String categoryName, JalaliDateFilter monthFilter)
+      onCategorySelected;
+
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  JalaliDateFilter _selectedMonth = JalaliDateFilter.thisMonth();
+  bool _pickingMonth = false;
+
+  Future<void> _pickCustomMonth(FinanceMapper mapper) async {
+    if (_pickingMonth) return;
+    _pickingMonth = true;
+    try {
+      final JalaliDateFilter? picked = await showJalaliPeriodPickerSheet(
+        context: context,
+        title: 'انتخاب ماه و سال',
+        initialFilter: _selectedMonth,
+        countsByYearMonth: mapper.expenseCountsByYearMonth,
+        allowAll: false,
+        allowWholeYear: false,
+        allowQuickRanges: false,
+        itemUnitLabel: 'هزینه',
+      );
+      if (picked != null && mounted) {
+        setState(() => _selectedMonth = picked);
+      }
+    } finally {
+      _pickingMonth = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +65,7 @@ class HomeTab extends StatelessWidget {
     final FinanceMapper m = FinanceMapper(state);
     final List<UiAccount> accounts = m.accounts;
     final List<UiTransaction> transactions = m.recentTransactions(5);
-    final Map<UiCategory, int> expenses = m.expenseByCategory;
+    final List<CategoryExpenseSlice> slices = m.expenseBreakdown(_selectedMonth);
     final int total = accounts.fold(0, (s, a) => s + a.balanceRial);
 
     return SafeArea(
@@ -39,17 +75,25 @@ class HomeTab extends StatelessWidget {
           context.read<FinanceBloc>().add(const FinanceSyncRequested());
         },
         child: ListView(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.only(
+            bottom: SiahehGlass.floatingNavBottomInset,
+          ),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.18),
+                  GlassContainer(
+                    useOwnLayer: true,
+                    width: 46,
+                    height: 46,
+                    shape: const LiquidOval(),
+                    settings: SiahehGlass.cardSettings(theme.brightness),
+                    alignment: Alignment.center,
                     child: Icon(
                       Icons.account_balance_wallet_rounded,
                       color: theme.colorScheme.primary,
+                      size: 22,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -66,26 +110,38 @@ class HomeTab extends StatelessWidget {
                         Text(
                           m.currentJalaliMonthLabel,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.62,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  IconButton.outlined(
-                    tooltip: 'بروزرسانی پیامک‌ها',
-                    onPressed: state.syncing
-                        ? null
-                        : () => context.read<FinanceBloc>().add(
-                            const FinanceSyncRequested(),
-                          ),
-                    icon: state.syncing
-                        ? const SizedBox(
+                  GlassButton.custom(
+                    useOwnLayer: true,
+                    width: 44,
+                    height: 44,
+                    stretch: 0.15,
+                    enabled: !state.syncing,
+                    label: 'بروزرسانی پیامک‌ها',
+                    onTap: () => context.read<FinanceBloc>().add(
+                      const FinanceSyncRequested(),
+                    ),
+                    child: state.syncing
+                        ? SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                            ),
                           )
-                        : const Icon(Icons.sync_rounded),
+                        : Icon(
+                            Icons.sync_rounded,
+                            size: 21,
+                            color: theme.colorScheme.onSurface,
+                          ),
                   ),
                 ],
               ),
@@ -109,17 +165,16 @@ class HomeTab extends StatelessWidget {
             SectionHeader(
               title: 'حساب‌های من',
               actionLabel: 'پیامک‌ها',
-              onAction: onSeeAllMessages,
+              onAction: widget.onSeeAllMessages,
             ),
             if (accounts.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
                   padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: theme.colorScheme.outline),
+                  decoration: SiahehGlass.frostedRowDecoration(
+                    context,
+                    radius: 20,
                   ),
                   child: Text(
                     'هنوز حساب بانکی شناسایی نشده است. پس از دادن دسترسی پیامک، تمام بانک‌های شما به صورت خودکار تشخیص داده می‌شوند.',
@@ -129,23 +184,34 @@ class HomeTab extends StatelessWidget {
               )
             else
               SizedBox(
-                height: 140,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: accounts.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (_, i) => AccountCard(account: accounts[i]),
+                height: 144,
+                child: AdaptiveLiquidGlassLayer(
+                  settings: SiahehGlass.cardSettings(theme.brightness),
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: accounts.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 12),
+                    itemBuilder: (_, i) => AccountCard(account: accounts[i]),
+                  ),
                 ),
               ),
-            if (expenses.isNotEmpty) ...[
+            if (state.transactions.isNotEmpty) ...[
               const SectionHeader(title: 'هزینه‌ها بر اساس دسته'),
-              ExpenseDonut(data: expenses),
+              ExpenseDonut(
+                selectedMonth: _selectedMonth,
+                onMonthChanged: (month) =>
+                    setState(() => _selectedMonth = month),
+                onPickCustomMonth: () => _pickCustomMonth(m),
+                slices: slices,
+                onCategoryTap: (category) =>
+                    widget.onCategorySelected(category, _selectedMonth),
+              ),
             ],
             SectionHeader(
               title: 'آخرین تراکنش‌ها',
               actionLabel: 'همه',
-              onAction: onSeeAllTransactions,
+              onAction: widget.onSeeAllTransactions,
             ),
             if (transactions.isEmpty)
               Padding(
@@ -158,7 +224,7 @@ class HomeTab extends StatelessWidget {
                 ),
               )
             else
-              for (final tx in transactions.take(5))
+              for (final tx in transactions)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
                   child: TransactionTile(

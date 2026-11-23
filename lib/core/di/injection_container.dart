@@ -3,6 +3,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:siaheh/features/sms/data/datasources/sms_inbox_data_source.dart';
 import 'package:siaheh/features/sms/data/datasources/sms_local_data_source.dart';
 import 'package:siaheh/features/sms/data/parsers/bank_detector.dart';
+import 'package:siaheh/features/sms/data/parsers/expense_categorizer.dart';
 import 'package:siaheh/features/sms/data/parsers/generic_sms_parser.dart';
 import 'package:siaheh/features/sms/data/parsers/internal_transfer_detector.dart';
 import 'package:siaheh/features/sms/data/parsers/sms_parser_pipeline.dart';
@@ -32,8 +33,11 @@ Future<void> initSmsFeature() async {
     ..registerLazySingleton<InternalTransferDetector>(
       () => const InternalTransferDetector(),
     )
+    ..registerLazySingleton<ExpenseCategorizer>(
+      () => const ExpenseCategorizer(),
+    )
     ..registerLazySingleton<SmsRepository>(
-      () => SmsRepositoryImpl(sl(), sl(), sl(), sl()),
+      () => SmsRepositoryImpl(sl(), sl(), sl(), sl(), sl()),
     )
     ..registerLazySingleton<FinanceBloc>(() => FinanceBloc(sl()));
 }

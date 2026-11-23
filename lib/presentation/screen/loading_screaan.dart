@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:lottie/lottie.dart';
+import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/presentation/screen/dashboard_screen.dart';
 
 class LoadingScreaan extends StatefulWidget {
@@ -25,14 +27,41 @@ class _LoadingScreaanState extends State<LoadingScreaan> {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
     final Size size = MediaQuery.sizeOf(context);
+    final double haloSize = (size.shortestSide * 0.56).clamp(180.0, 240.0);
 
-    return Scaffold(
-      body: Center(
-        child: Lottie.asset(
-          "assets/lottie/loading.json",
-          height: size.height * 0.3,
-          width: size.height * 0.3,
+    return SiahehAmbientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GlassContainer(
+                useOwnLayer: true,
+                width: haloSize,
+                height: haloSize,
+                shape: const LiquidOval(),
+                settings: SiahehGlass.cardSettings(theme.brightness),
+                alignment: Alignment.center,
+                child: Lottie.asset(
+                  "assets/lottie/loading.json",
+                  height: haloSize * 0.82,
+                  width: haloSize * 0.82,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'سیاهه',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.primary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

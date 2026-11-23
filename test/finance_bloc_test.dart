@@ -2,22 +2,29 @@ import 'dart:async';
 
 import 'package:dartz/dartz.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shamsi_date/shamsi_date.dart';
 import 'package:siaheh/core/error/failure.dart';
+import 'package:siaheh/features/sms/data/parsers/expense_categorizer.dart';
 import 'package:siaheh/features/sms/data/parsers/internal_transfer_detector.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_sms_message.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_transaction.dart';
+import 'package:siaheh/features/sms/domain/entities/category_rule.dart';
+import 'package:siaheh/features/sms/domain/entities/custom_category.dart';
 import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
 import 'package:siaheh/features/sms/domain/repositories/sms_repository.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
 import 'package:siaheh/presentation/bloc/finance_event.dart';
 import 'package:siaheh/presentation/bloc/finance_state.dart';
 import 'package:siaheh/presentation/mapper/finance_mapper.dart';
+import 'package:siaheh/presentation/models/finance_ui_models.dart';
 
 class _FakeSmsRepository implements SmsRepository {
   bool permission = true;
   final List<BankTransaction> txs = [];
   final List<BankSmsMessage> messages = [];
   final List<SmsSender> senders = [];
+  final List<CustomCategory> customCategories = [];
+  final List<CategoryRule> categoryRules = [];
   final StreamController<BankSmsMessage> incoming =
       StreamController<BankSmsMessage>.broadcast();
 
@@ -48,6 +55,29 @@ class _FakeSmsRepository implements SmsRepository {
       Right(List.of(txs));
 
   @override
+  Future<Either<Failure, List<CustomCategory>>> getCustomCategories() async =>
+      Right(List.of(customCategories));
+
+  @override
+  Future<Either<Failure, Unit>> saveCustomCategory(
+    CustomCategory category,
+  ) async {
+    customCategories.removeWhere((c) => c.name == category.name);
+    customCategories.add(category);
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, Unit>> deleteCustomCategory(String name) async {
+    customCategories.removeWhere((c) => c.name == name);
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<Failure, List<CategoryRule>>> getCategoryRules() async =>
+      Right(List.of(categoryRules));
+
+  @override
   Future<Either<Failure, Unit>> saveSender(SmsSender sender) async {
     senders.removeWhere((s) => s.number == sender.number);
     senders.add(sender);
@@ -61,7 +91,10 @@ class _FakeSmsRepository implements SmsRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> updateTransaction(BankTransaction tx) async {
+  Future<Either<Failure, Unit>> updateTransaction(
+    BankTransaction tx, {
+    bool applyToSimilar = false,
+  }) async {
     final idx = txs.indexWhere((t) => t.id == tx.id);
     if (idx >= 0) txs[idx] = tx;
     return const Right(unit);
@@ -271,5 +304,127 @@ void main() {
     final blu = mapper.accounts.firstWhere((a) => a.bank.key == 'blubank');
     expect(blu.last4, 'اصلی');
     expect(blu.balanceRial, 5000000);
+  });
+
+  test('FinanceBloc adds custom category and FinanceMapper computes sorted expenseBreakdown', () async {
+    const customCat = CustomCategory(
+      name: 'کافه و دورهمی',
+      iconCodePoint: 0xe191,
+      colorValue: 0xFF14B8A6,
+    );
+    bloc.add(const FinanceCustomCategoryAdded(customCat));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(bloc.state.customCategories, [customCat]);
+
+    final now = DateTime.now();
+    final mapper = FinanceMapper(
+      FinanceState(
+        customCategories: const [customCat],
+        transactions: [
+          BankTransaction(
+            id: '1',
+            bankKey: 'blubank',
+            accountNumber: 'اصلی',
+            senderNumber: 'BluBank',
+            amountRial: 3000000,
+            type: TransactionType.expense,
+            occurredAt: now,
+            rawBody: 'اسنپ',
+            categoryId: CategoryIds.transport,
+          ),
+          BankTransaction(
+            id: '2',
+            bankKey: 'blubank',
+            accountNumber: 'اصلی',
+            senderNumber: 'BluBank',
+            amountRial: 1000000,
+            type: TransactionType.expense,
+            occurredAt: now,
+            rawBody: 'ایرانسل',
+            categoryId: CategoryIds.internet,
+          ),
+          BankTransaction(
+            id: '3',
+            bankKey: 'blubank',
+            accountNumber: 'اصلی',
+            senderNumber: 'BluBank',
+            amountRial: 1000000,
+            type: TransactionType.expense,
+            occurredAt: now,
+            rawBody: 'کافه',
+            categoryId: 'کافه و دورهمی',
+          ),
+        ],
+      ),
+    );
+
+    final slices = mapper.expenseBreakdown(JalaliDateFilter.thisMonth(now));
+    expect(slices.length, 3);
+    expect(slices.first.category.name, CategoryIds.transport);
+    expect(slices.first.percentage, closeTo(60.0, 0.1));
+    expect(slices.any((s) => s.category.name == 'کافه و دورهمی'), isTrue);
+  });
+
+  test('JalaliDateFilter supports custom month, whole year, and year wrap-around', () {
+    final farvardin1404 = Jalali(1404, 1, 15).toDateTime();
+    final mehr1404 = Jalali(1404, 7, 10).toDateTime();
+    final esfand1403 = Jalali(1403, 12, 20).toDateTime();
+
+    const filterMehr1404 = JalaliDateFilter.month(year: 1404, month: 7);
+    expect(filterMehr1404.matches(mehr1404), isTrue);
+    expect(filterMehr1404.matches(farvardin1404), isFalse);
+    expect(filterMehr1404.matches(esfand1403), isFalse);
+
+    const filterYear1404 = JalaliDateFilter.year(1404);
+    expect(filterYear1404.matches(farvardin1404), isTrue);
+    expect(filterYear1404.matches(mehr1404), isTrue);
+    expect(filterYear1404.matches(esfand1403), isFalse);
+
+    // Month wrap-around across Jalali year boundary
+    const farvardinFilter = JalaliDateFilter.month(year: 1404, month: 1);
+    expect(
+      farvardinFilter.previousMonth(),
+      const JalaliDateFilter.month(year: 1403, month: 12),
+    );
+    expect(
+      const JalaliDateFilter.month(year: 1403, month: 12).nextMonth(),
+      farvardinFilter,
+    );
+
+    final mapper = FinanceMapper(
+      FinanceState(
+        transactions: [
+          BankTransaction(
+            id: 'old',
+            bankKey: 'blubank',
+            accountNumber: '1234',
+            senderNumber: 'BluBank',
+            amountRial: 500000,
+            type: TransactionType.expense,
+            occurredAt: mehr1404,
+            rawBody: 'اسنپ',
+            categoryId: CategoryIds.transport,
+          ),
+          BankTransaction(
+            id: 'other',
+            bankKey: 'blubank',
+            accountNumber: '1234',
+            senderNumber: 'BluBank',
+            amountRial: 900000,
+            type: TransactionType.expense,
+            occurredAt: esfand1403,
+            rawBody: 'ایرانسل',
+            categoryId: CategoryIds.internet,
+          ),
+        ],
+      ),
+    );
+
+    final mehrSlices = mapper.expenseBreakdown(filterMehr1404);
+    expect(mehrSlices.length, 1);
+    expect(mehrSlices.first.category.name, CategoryIds.transport);
+    expect(mehrSlices.first.amountRial, 500000);
+    expect(mapper.expenseCountsByYearMonth[1404]?[7], 1);
+    expect(mapper.expenseCountsByYearMonth[1403]?[12], 1);
   });
 }

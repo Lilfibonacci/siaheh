@@ -1,44 +1,60 @@
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_sms_message.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_transaction.dart';
+import 'package:siaheh/features/sms/domain/entities/category_rule.dart';
+import 'package:siaheh/features/sms/domain/entities/custom_category.dart';
 import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
 
-/// Hive-backed local storage with 4 clean boxes:
+/// Hive-backed local storage with 6 clean boxes:
 /// - `transactions`: parsed financial transactions
 /// - `bank_messages`: all detected bank SMS (transactions + OTP + info + unparsed)
 /// - `senders`: tracked bank senders (auto-discovered & user-added)
-/// - `sync_meta`: incremental sync cursor & detector version metadata
+/// - `custom_categories`: user-created expense/income categories
+/// - `category_rules`: learned merchant -> category rules
+/// - `sync_meta`: incremental sync cursor & schema version metadata
 class SmsLocalDataSource {
   SmsLocalDataSource(
     this._transactions,
     this._bankMessages,
     this._senders,
+    this._customCategories,
+    this._categoryRules,
     this._syncMeta,
   );
 
   static const String transactionsBox = 'transactions';
   static const String bankMessagesBox = 'bank_messages';
   static const String sendersBox = 'senders';
+  static const String customCategoriesBox = 'custom_categories';
+  static const String categoryRulesBox = 'category_rules';
   static const String syncMetaBox = 'sync_meta';
 
   static const String _lastSyncedAtKey = 'last_synced_at_ms';
   static const String _detectorVersionKey = 'detector_version';
+  static const String _categorizerVersionKey = 'categorizer_version';
 
   final Box<Map<dynamic, dynamic>> _transactions;
   final Box<Map<dynamic, dynamic>> _bankMessages;
   final Box<Map<dynamic, dynamic>> _senders;
+  final Box<Map<dynamic, dynamic>> _customCategories;
+  final Box<Map<dynamic, dynamic>> _categoryRules;
   final Box<dynamic> _syncMeta;
 
   static Future<SmsLocalDataSource> open() async {
     final tx = await Hive.openBox<Map<dynamic, dynamic>>(transactionsBox);
     final msgs = await Hive.openBox<Map<dynamic, dynamic>>(bankMessagesBox);
     final senders = await Hive.openBox<Map<dynamic, dynamic>>(sendersBox);
+    final customCats = await Hive.openBox<Map<dynamic, dynamic>>(
+      customCategoriesBox,
+    );
+    final rules = await Hive.openBox<Map<dynamic, dynamic>>(categoryRulesBox);
     final meta = await Hive.openBox<dynamic>(syncMetaBox);
-    return SmsLocalDataSource(tx, msgs, senders, meta);
+    return SmsLocalDataSource(tx, msgs, senders, customCats, rules, meta);
   }
 
   /// Ensures every Hive key is printable ASCII and at most 200 chars so
-  /// non-ASCII sender names or bidi marks never throw [HiveError].
+  /// non-ASCII sender names, Persian category names, or bidi marks never throw
+  /// [HiveError].
   static String _safeKey(String raw) {
     if (raw.isNotEmpty && raw.length <= 200) {
       var printableAscii = true;
@@ -115,7 +131,29 @@ class SmsLocalDataSource {
   Future<void> deleteSender(String number) =>
       _senders.delete(_safeKey(number));
 
-  // --- Sync Cursor & Detector Version ---
+  // --- Custom Categories ---
+
+  List<CustomCategory> customCategories() =>
+      _customCategories.values.map(CustomCategory.fromMap).toList();
+
+  Future<void> putCustomCategory(CustomCategory category) =>
+      _customCategories.put(_safeKey(category.name), category.toMap());
+
+  Future<void> deleteCustomCategory(String name) =>
+      _customCategories.delete(_safeKey(name));
+
+  // --- Learned Category Rules ---
+
+  List<CategoryRule> categoryRules() =>
+      _categoryRules.values.map(CategoryRule.fromMap).toList();
+
+  Future<void> putCategoryRule(CategoryRule rule) =>
+      _categoryRules.put(_safeKey(rule.pattern), rule.toMap());
+
+  Future<void> deleteCategoryRule(String pattern) =>
+      _categoryRules.delete(_safeKey(pattern));
+
+  // --- Sync Cursor & Schema Versions ---
 
   DateTime? lastSyncedAt() {
     final ms = _syncMeta.get(_lastSyncedAtKey) as int?;
@@ -132,12 +170,18 @@ class SmsLocalDataSource {
   Future<void> setDetectorVersion(int version) =>
       _syncMeta.put(_detectorVersionKey, version);
 
+  int categorizerVersion() =>
+      (_syncMeta.get(_categorizerVersionKey) as int?) ?? 0;
+
+  Future<void> setCategorizerVersion(int version) =>
+      _syncMeta.put(_categorizerVersionKey, version);
+
   /// Purges auto-detected senders (that are still enabled), all cached
   /// bank messages, and non-user-edited transactions so a fresh full rescan
   /// can cleanly rebuild state using updated detection rules.
   ///
-  /// User-added manual senders, user-disabled senders, and `userEdited == true`
-  /// transactions are preserved.
+  /// User-added manual senders, user-disabled senders, `userEdited == true`
+  /// transactions, custom categories, and learned rules are preserved.
   Future<void> purgeAutoDetectedData() async {
     final senderKeysToDelete = <dynamic>[];
     for (final key in _senders.keys) {

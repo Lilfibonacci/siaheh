@@ -7,7 +7,7 @@ import 'package:siaheh/presentation/bloc/finance_event.dart';
 import 'package:siaheh/presentation/bloc/finance_state.dart';
 
 /// Standard event-driven BLoC managing bank SMS messages, transactions,
-/// accounts, senders, and incremental inbox synchronization.
+/// accounts, senders, custom categories, learned rules, and incremental sync.
 class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   FinanceBloc(this._repo) : super(const FinanceState()) {
     on<FinanceStarted>(_onStarted);
@@ -20,6 +20,8 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     on<FinanceSenderDeleted>(_onSenderDeleted);
     on<FinanceTransactionUpdated>(_onTransactionUpdated);
     on<FinanceTransactionDeleted>(_onTransactionDeleted);
+    on<FinanceCustomCategoryAdded>(_onCustomCategoryAdded);
+    on<FinanceCustomCategoryDeleted>(_onCustomCategoryDeleted);
   }
 
   final SmsRepository _repo;
@@ -32,6 +34,8 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     final tx = await _repo.getTransactions();
     final msgs = await _repo.getBankMessages();
     final senders = await _repo.getSenders();
+    final customCats = await _repo.getCustomCategories();
+    final rules = await _repo.getCategoryRules();
     final granted = await _repo.hasSmsPermission();
 
     emit(
@@ -39,6 +43,8 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
         transactions: tx.getOrElse(() => state.transactions),
         bankMessages: msgs.getOrElse(() => state.bankMessages),
         senders: senders.getOrElse(() => state.senders),
+        customCategories: customCats.getOrElse(() => state.customCategories),
+        categoryRules: rules.getOrElse(() => state.categoryRules),
         hasPermission: granted,
         loading: false,
         syncing: granted,
@@ -106,7 +112,6 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   ) async {
     await _repo.saveSender(event.sender);
     if (state.hasPermission) {
-      // Full rescan so historical messages from this newly added sender are imported.
       await _performSync(emit, fullRescan: true);
     } else {
       await _reloadLocal(emit);
@@ -137,7 +142,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     FinanceTransactionUpdated event,
     Emitter<FinanceState> emit,
   ) async {
-    await _repo.updateTransaction(event.transaction);
+    await _repo.updateTransaction(
+      event.transaction,
+      applyToSimilar: event.applyToSimilar,
+    );
     await _reloadLocal(emit);
   }
 
@@ -146,6 +154,22 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     Emitter<FinanceState> emit,
   ) async {
     await _repo.deleteTransaction(event.id);
+    await _reloadLocal(emit);
+  }
+
+  Future<void> _onCustomCategoryAdded(
+    FinanceCustomCategoryAdded event,
+    Emitter<FinanceState> emit,
+  ) async {
+    await _repo.saveCustomCategory(event.category);
+    await _reloadLocal(emit);
+  }
+
+  Future<void> _onCustomCategoryDeleted(
+    FinanceCustomCategoryDeleted event,
+    Emitter<FinanceState> emit,
+  ) async {
+    await _repo.deleteCustomCategory(event.name);
     await _reloadLocal(emit);
   }
 
@@ -179,11 +203,15 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     final tx = await _repo.getTransactions();
     final msgs = await _repo.getBankMessages();
     final senders = await _repo.getSenders();
+    final customCats = await _repo.getCustomCategories();
+    final rules = await _repo.getCategoryRules();
     emit(
       state.copyWith(
         transactions: tx.getOrElse(() => state.transactions),
         bankMessages: msgs.getOrElse(() => state.bankMessages),
         senders: senders.getOrElse(() => state.senders),
+        customCategories: customCats.getOrElse(() => state.customCategories),
+        categoryRules: rules.getOrElse(() => state.categoryRules),
         loading: false,
         syncing: false,
         error: error,

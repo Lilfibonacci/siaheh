@@ -6,10 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:siaheh/core/error/failure.dart';
 import 'package:siaheh/features/sms/data/datasources/sms_inbox_data_source.dart';
 import 'package:siaheh/features/sms/data/datasources/sms_local_data_source.dart';
+import 'package:siaheh/features/sms/data/parsers/expense_categorizer.dart';
 import 'package:siaheh/features/sms/data/parsers/internal_transfer_detector.dart';
 import 'package:siaheh/features/sms/data/parsers/sms_parser_pipeline.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_sms_message.dart';
 import 'package:siaheh/features/sms/domain/entities/bank_transaction.dart';
+import 'package:siaheh/features/sms/domain/entities/category_rule.dart';
+import 'package:siaheh/features/sms/domain/entities/custom_category.dart';
 import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
 import 'package:siaheh/features/sms/domain/repositories/sms_repository.dart';
 
@@ -19,12 +22,18 @@ class SmsRepositoryImpl implements SmsRepository {
     this._inbox,
     this._pipeline,
     this._transferDetector,
+    this._categorizer,
   );
 
   /// Increment whenever bank detection / filtering rules change so cached
   /// auto-detected records on existing devices are automatically purged and
   /// rescanned cleanly.
   static const int currentDetectorVersion = 2;
+
+  /// Increment whenever auto-categorization rules or OTP correlation improve
+  /// so existing unedited transactions are re-categorized once without needing
+  /// to re-read the entire Android SMS inbox.
+  static const int currentCategorizerVersion = 1;
 
   static const int _pageSize = 500;
   static const int _maxPages = 120; // Up to 60,000 SMS
@@ -33,6 +42,7 @@ class SmsRepositoryImpl implements SmsRepository {
   final SmsInboxDataSource _inbox;
   final SmsParserPipeline _pipeline;
   final InternalTransferDetector _transferDetector;
+  final ExpenseCategorizer _categorizer;
 
   final StreamController<BankSmsMessage> _incoming =
       StreamController<BankSmsMessage>.broadcast();
@@ -42,6 +52,14 @@ class SmsRepositoryImpl implements SmsRepository {
   /// Small overlap when performing incremental inbox sync so delayed SMS
   /// delivery timestamps are never skipped.
   static const Duration _syncOverlap = Duration(minutes: 2);
+
+  static const Set<String> _genericTitles = {
+    'برداشت از حساب',
+    'واریز به حساب',
+    'انتقال بین حساب‌ها',
+    'خرید فروشگاهی',
+    'تراکنش نامشخص',
+  };
 
   @override
   Stream<BankSmsMessage> get incomingMessages {
@@ -60,6 +78,10 @@ class SmsRepositoryImpl implements SmsRepository {
           if (result.message != null) {
             if (result.transaction != null) {
               await _linkInternalTransfers();
+            }
+            if (result.transaction != null ||
+                result.message!.kind == BankSmsKind.otp) {
+              await _categorizeUneditedTransactions();
             }
             await _local.setLastSyncedAt(sms.date);
             _incoming.add(result.message!);
@@ -171,6 +193,21 @@ class SmsRepositoryImpl implements SmsRepository {
     return changes.length ~/ 2;
   }
 
+  Future<int> _categorizeUneditedTransactions() async {
+    final allTx = _local.transactions();
+    final allMsgs = _local.bankMessages();
+    final rules = _local.categoryRules();
+    final changes = _categorizer.categorizeAll(
+      transactions: allTx,
+      bankMessages: allMsgs,
+      userRules: rules,
+    );
+    if (changes.isNotEmpty) {
+      await _local.putTransactions(changes);
+    }
+    return changes.length;
+  }
+
   @override
   Future<Either<Failure, SyncResult>> syncInbox({bool fullRescan = false}) {
     final inFlight = _inFlightSync;
@@ -192,11 +229,13 @@ class SmsRepositoryImpl implements SmsRepository {
 
       final needsUpgradePurge =
           _local.detectorVersion() < currentDetectorVersion;
+      final needsRecategorize =
+          _local.categorizerVersion() < currentCategorizerVersion;
       final effectiveFullRescan = fullRescan || needsUpgradePurge;
 
       if (kDebugMode) {
         debugPrint(
-          '[SiahehSync] start fullRescan=$fullRescan upgradePurge=$needsUpgradePurge',
+          '[SiahehSync] start fullRescan=$fullRescan upgradePurge=$needsUpgradePurge recategorize=$needsRecategorize',
         );
       }
 
@@ -348,6 +387,14 @@ class SmsRepositoryImpl implements SmsRepository {
         linkedTransfers = await _linkInternalTransfers();
       }
 
+      var categorizedCount = 0;
+      if (newTransactions > 0 ||
+          newMessages > 0 ||
+          effectiveFullRescan ||
+          needsRecategorize) {
+        categorizedCount = await _categorizeUneditedTransactions();
+      }
+
       if (newestSeen != null) {
         await _local.setLastSyncedAt(newestSeen);
       }
@@ -355,11 +402,15 @@ class SmsRepositoryImpl implements SmsRepository {
       if (needsUpgradePurge) {
         await _local.setDetectorVersion(currentDetectorVersion);
       }
+      if (needsRecategorize) {
+        await _local.setCategorizerVersion(currentCategorizerVersion);
+      }
 
       if (kDebugMode) {
         debugPrint(
           '[SiahehSync] done in ${sw.elapsedMilliseconds}ms '
-          '(scanned=$totalScanned, msgs=$newMessages, txs=$newTransactions, senders=$discoveredSenders)',
+          '(scanned=$totalScanned, msgs=$newMessages, txs=$newTransactions, '
+          'senders=$discoveredSenders, categorized=$categorizedCount)',
         );
       }
 
@@ -384,11 +435,52 @@ class SmsRepositoryImpl implements SmsRepository {
       _guard(() async => _local.transactions());
 
   @override
-  Future<Either<Failure, Unit>> updateTransaction(BankTransaction tx) =>
-      _guard(() async {
-        await _local.putTransaction(tx.copyWith(userEdited: true));
-        return unit;
-      });
+  Future<Either<Failure, Unit>> updateTransaction(
+    BankTransaction tx, {
+    bool applyToSimilar = false,
+  }) => _guard(() async {
+    final edited = tx.copyWith(userEdited: true);
+    await _local.putTransaction(edited);
+
+    if (applyToSimilar && edited.categoryId != null) {
+      final candidatePattern = _extractLearningPattern(edited);
+      if (candidatePattern != null) {
+        final rule = CategoryRule(
+          pattern: candidatePattern,
+          categoryId: edited.categoryId!,
+          preferredTitle:
+              edited.title != null && !_genericTitles.contains(edited.title)
+              ? edited.title
+              : null,
+        );
+        await _local.putCategoryRule(rule);
+
+        final similarChanges = _categorizer.applyRuleToExisting(
+          transactions: _local.transactions(),
+          rule: rule,
+          excludeTransactionId: edited.id,
+        );
+        if (similarChanges.isNotEmpty) {
+          await _local.putTransactions(similarChanges);
+        }
+      }
+    }
+    return unit;
+  });
+
+  static String? _extractLearningPattern(BankTransaction tx) {
+    final merchant = tx.merchantName?.trim();
+    if (merchant != null && merchant.length >= 2) {
+      return ExpenseCategorizer.normalizePattern(merchant);
+    }
+    final title = tx.title?.trim();
+    if (title != null &&
+        title.length >= 2 &&
+        !_genericTitles.contains(title)) {
+      return ExpenseCategorizer.normalizePattern(title);
+    }
+    return null;
+  }
 
   @override
   Future<Either<Failure, Unit>> deleteTransaction(String id) =>
@@ -431,6 +523,28 @@ class SmsRepositoryImpl implements SmsRepository {
         }
         return unit;
       });
+
+  @override
+  Future<Either<Failure, List<CustomCategory>>> getCustomCategories() =>
+      _guard(() async => _local.customCategories());
+
+  @override
+  Future<Either<Failure, Unit>> saveCustomCategory(CustomCategory category) =>
+      _guard(() async {
+        await _local.putCustomCategory(category);
+        return unit;
+      });
+
+  @override
+  Future<Either<Failure, Unit>> deleteCustomCategory(String name) =>
+      _guard(() async {
+        await _local.deleteCustomCategory(name);
+        return unit;
+      });
+
+  @override
+  Future<Either<Failure, List<CategoryRule>>> getCategoryRules() =>
+      _guard(() async => _local.categoryRules());
 
   @override
   Future<bool> hasSmsPermission() => _inbox.hasPermission();
