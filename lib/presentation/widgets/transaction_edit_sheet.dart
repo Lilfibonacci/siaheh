@@ -146,7 +146,7 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
     final List<UiCategory> categories =
-        FinanceMapper(context.watch<FinanceBloc>().state).allCategories;
+        FinanceMapper.of(context.watch<FinanceBloc>().state).allCategories;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(

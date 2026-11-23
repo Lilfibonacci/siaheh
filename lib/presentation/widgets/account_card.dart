@@ -1,47 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/core/utils/persian_format.dart';
 import 'package:siaheh/presentation/models/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
 
 class AccountCard extends StatelessWidget {
-  const AccountCard({
-    super.key,
-    required this.account,
-    this.useOwnLayer = false,
-  });
+  const AccountCard({super.key, required this.account});
 
   static final RegExp _fourDigits = RegExp(r'^\d{4}$');
 
   final UiAccount account;
-  final bool useOwnLayer;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
-    final bool isDark = theme.brightness == Brightness.dark;
     final bool isDigits = _fourDigits.hasMatch(account.last4);
     final String subtitle = isDigits
         ? 'حساب •••• ${PersianFormat.digits(account.last4)}'
         : 'حساب ${PersianFormat.digits(account.last4)}';
 
-    return GlassContainer(
-      width: 204,
-      useOwnLayer: useOwnLayer,
-      shape: const LiquidRoundedSuperellipse(borderRadius: 22),
-      settings: useOwnLayer ? SiahehGlass.cardSettings(theme.brightness) : null,
+    return RepaintBoundary(
       child: Container(
+        width: 204,
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.12)
-                : Colors.white.withValues(alpha: 0.85),
-          ),
-        ),
+        decoration: SiahehGlass.elevatedGlassDecoration(context, radius: 22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

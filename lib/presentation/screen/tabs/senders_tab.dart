@@ -19,7 +19,7 @@ class SendersTab extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
     final FinanceState state = context.watch<FinanceBloc>().state;
-    final List<UiSender> senders = FinanceMapper(state).senders;
+    final List<UiSender> senders = FinanceMapper.of(state).senders;
 
     return SafeArea(
       bottom: false,
@@ -122,19 +122,28 @@ class SendersTab extends StatelessWidget {
                     ),
                   ),
                 ),
-              for (final UiSender sender in senders)
-                _SenderTile(
-                  sender: sender,
-                  enabled: sender.enabled,
-                  onChanged: (v) {
-                    final entity = state.senders
-                        .firstWhere((s) => s.number == sender.number);
-                    context.read<FinanceBloc>().add(
-                      FinanceSenderToggled(sender: entity, enabled: v),
-                    );
-                  },
-                  onDelete: () => context.read<FinanceBloc>().add(
-                    FinanceSenderDeleted(sender.number),
+              if (senders.isNotEmpty)
+                AdaptiveLiquidGlassLayer(
+                  quality: GlassQuality.standard,
+                  child: Column(
+                    children: [
+                      for (final UiSender sender in senders)
+                        _SenderTile(
+                          sender: sender,
+                          enabled: sender.enabled,
+                          onChanged: (v) {
+                            final entity = state.senders.firstWhere(
+                              (s) => s.number == sender.number,
+                            );
+                            context.read<FinanceBloc>().add(
+                              FinanceSenderToggled(sender: entity, enabled: v),
+                            );
+                          },
+                          onDelete: () => context.read<FinanceBloc>().add(
+                            FinanceSenderDeleted(sender.number),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
             ],
@@ -270,7 +279,8 @@ class _SenderTile extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           GlassSwitch(
-            useOwnLayer: true,
+            useOwnLayer: false,
+            quality: GlassQuality.standard,
             value: enabled,
             onChanged: onChanged,
             width: 54,

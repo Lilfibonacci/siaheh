@@ -83,7 +83,7 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
     final FinanceState state = context.watch<FinanceBloc>().state;
-    final FinanceMapper mapper = FinanceMapper(state);
+    final FinanceMapper mapper = FinanceMapper.of(state);
     final List<BankSmsMessage> allMessages = mapper.activeBankMessages;
     final List<UiBank> banks = mapper.detectedBanks;
     final List<BankSmsMessage> items = _filtered(allMessages);
@@ -133,6 +133,9 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
                         width: 42,
                         height: 42,
                         stretch: 0.15,
+                        tintColor: _dateFilter.isActive
+                            ? scheme.primary.withValues(alpha: 0.20)
+                            : null,
                         label: 'فیلتر زمانی',
                         onTap: () => _openDateFilterPicker(mapper),
                         child: Icon(
@@ -251,16 +254,16 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               children: [
-                JalaliDateFilterChip(
-                  filter: _dateFilter,
-                  onTap: () => _openDateFilterPicker(mapper),
-                  onClear: _dateFilter.isActive
-                      ? () => setState(
-                          () => _dateFilter = const JalaliDateFilter.all(),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 8),
+                if (_dateFilter.isActive) ...[
+                  JalaliDateFilterChip(
+                    filter: _dateFilter,
+                    onTap: () => _openDateFilterPicker(mapper),
+                    onClear: () => setState(
+                      () => _dateFilter = const JalaliDateFilter.all(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 _KindChip(
                   label: 'همه',
                   selected: _selectedKind == null,
@@ -451,7 +454,7 @@ class _BankMessageCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          SelectableText(
+          Text(
             message.body,
             style: theme.textTheme.bodySmall?.copyWith(height: 1.7),
           ),

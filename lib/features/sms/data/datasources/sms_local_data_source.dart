@@ -32,6 +32,7 @@ class SmsLocalDataSource {
   static const String _lastSyncedAtKey = 'last_synced_at_ms';
   static const String _detectorVersionKey = 'detector_version';
   static const String _categorizerVersionKey = 'categorizer_version';
+  static const String _themeModeKey = 'theme_mode';
 
   final Box<Map<dynamic, dynamic>> _transactions;
   final Box<Map<dynamic, dynamic>> _bankMessages;
@@ -245,4 +246,14 @@ class SmsLocalDataSource {
       await _transactions.deleteAll(txKeysToDelete);
     }
   }
+
+  // --- App Theme Preference ---
+
+  String? get themeModeName {
+    final raw = _syncMeta.get(_themeModeKey);
+    return raw is String ? raw : null;
+  }
+
+  Future<void> setThemeModeName(String name) =>
+      _syncMeta.put(_themeModeKey, name);
 }

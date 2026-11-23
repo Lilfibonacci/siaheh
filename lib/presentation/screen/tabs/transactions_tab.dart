@@ -134,7 +134,9 @@ class _TransactionsTabState extends State<TransactionsTab> {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
-    final FinanceMapper mapper = FinanceMapper(context.watch<FinanceBloc>().state);
+    final FinanceMapper mapper = FinanceMapper.of(
+      context.watch<FinanceBloc>().state,
+    );
     final List<UiBank> banks = mapper.detectedBanks;
     final List<BankTransaction> items = _filtered(mapper);
     final UiCategory? activeCategoryUi = widget.categoryFilter == null
@@ -180,6 +182,9 @@ class _TransactionsTabState extends State<TransactionsTab> {
                         width: 44,
                         height: 44,
                         stretch: 0.15,
+                        tintColor: _dateFilter.isActive
+                            ? scheme.primary.withValues(alpha: 0.20)
+                            : null,
                         label: 'فیلتر زمانی',
                         onTap: () => _openDateFilterPicker(mapper),
                         child: Icon(
@@ -283,16 +288,16 @@ class _TransactionsTabState extends State<TransactionsTab> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               children: [
-                JalaliDateFilterChip(
-                  filter: _dateFilter,
-                  onTap: () => _openDateFilterPicker(mapper),
-                  onClear: _dateFilter.isActive
-                      ? () => setState(
-                          () => _dateFilter = const JalaliDateFilter.all(),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 8),
+                if (_dateFilter.isActive) ...[
+                  JalaliDateFilterChip(
+                    filter: _dateFilter,
+                    onTap: () => _openDateFilterPicker(mapper),
+                    onClear: () => setState(
+                      () => _dateFilter = const JalaliDateFilter.all(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 for (final _Filter f in _Filter.values)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),

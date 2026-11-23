@@ -129,23 +129,15 @@ class _ExpenseDonutState extends State<ExpenseDonut> {
             ],
           ),
           const SizedBox(height: 12),
-          GlassContainer(
-            useOwnLayer: true,
-            shape: const LiquidRoundedSuperellipse(borderRadius: 26),
-            settings: SiahehGlass.cardSettings(theme.brightness),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.11)
-                      : Colors.white.withValues(alpha: 0.85),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: SiahehGlass.elevatedGlassDecoration(
+              context,
+              radius: 26,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                   // Active Jalali month bar with quick prev/next & picker trigger
                   Row(
                     children: [
@@ -251,10 +243,11 @@ class _ExpenseDonutState extends State<ExpenseDonut> {
                   else ...[
                     // Interactive Donut Chart
                     Center(
-                      child: SizedBox(
-                        width: 196,
-                        height: 196,
-                        child: Stack(
+                      child: RepaintBoundary(
+                        child: SizedBox(
+                          width: 196,
+                          height: 196,
+                          child: Stack(
                           alignment: Alignment.center,
                           children: [
                             PieChart(
@@ -414,6 +407,7 @@ class _ExpenseDonutState extends State<ExpenseDonut> {
                         ),
                       ),
                     ),
+                    ),
                     const SizedBox(height: 16),
                     Divider(
                       color: isDark
@@ -437,7 +431,6 @@ class _ExpenseDonutState extends State<ExpenseDonut> {
                 ],
               ),
             ),
-          ),
         ],
       ),
     );

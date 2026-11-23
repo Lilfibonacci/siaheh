@@ -10,6 +10,7 @@ import 'package:siaheh/features/sms/data/parsers/sms_parser_pipeline.dart';
 import 'package:siaheh/features/sms/data/repositories/sms_repository_impl.dart';
 import 'package:siaheh/features/sms/domain/repositories/sms_repository.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
+import 'package:siaheh/presentation/bloc/theme_bloc.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -22,8 +23,9 @@ Future<void> configureDependencies() async {
 }
 
 Future<void> initSmsFeature() async {
+  final localDataSource = await SmsLocalDataSource.open();
   sl
-    ..registerSingleton<SmsLocalDataSource>(await SmsLocalDataSource.open())
+    ..registerSingleton<SmsLocalDataSource>(localDataSource)
     ..registerLazySingleton<SmsInboxDataSource>(SmsInboxDataSource.new)
     ..registerLazySingleton<BankDetector>(() => const BankDetector())
     ..registerLazySingleton<GenericSmsParser>(() => const GenericSmsParser())
@@ -39,5 +41,11 @@ Future<void> initSmsFeature() async {
     ..registerLazySingleton<SmsRepository>(
       () => SmsRepositoryImpl(sl(), sl(), sl(), sl(), sl()),
     )
-    ..registerLazySingleton<FinanceBloc>(() => FinanceBloc(sl()));
+    ..registerLazySingleton<FinanceBloc>(() => FinanceBloc(sl()))
+    ..registerLazySingleton<ThemeBloc>(
+      () => ThemeBloc(
+        initialMode: ThemeBloc.parseModeName(localDataSource.themeModeName),
+        onModeChanged: (mode) => localDataSource.setThemeModeName(mode.name),
+      ),
+    );
 }

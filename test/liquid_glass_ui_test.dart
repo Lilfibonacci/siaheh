@@ -16,6 +16,7 @@ import 'package:siaheh/features/sms/domain/entities/sms_sender.dart';
 import 'package:siaheh/features/sms/domain/repositories/sms_repository.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
 import 'package:siaheh/presentation/bloc/finance_event.dart';
+import 'package:siaheh/presentation/bloc/theme_bloc.dart';
 import 'package:siaheh/presentation/screen/dashboard_screen.dart';
 import 'package:siaheh/presentation/widgets/account_card.dart';
 import 'package:siaheh/presentation/widgets/balance_header_card.dart';
@@ -125,19 +126,29 @@ class _TestSmsRepository implements SmsRepository {
   void dispose() => _incoming.close();
 }
 
-Widget _buildHarness(FinanceBloc bloc, ThemeMode mode) {
+Widget _buildHarness(
+  FinanceBloc bloc,
+  ThemeMode mode, {
+  ThemeBloc? themeBloc,
+}) {
+  final effectiveThemeBloc = themeBloc ?? ThemeBloc(initialMode: mode);
   return LiquidGlassWidgets.wrap(
     brightnessResolver: Theme.maybeBrightnessOf,
     theme: SiahehGlass.themeData,
-    child: BlocProvider.value(
-      value: bloc,
-      child: MaterialApp(
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: mode,
-        builder: (context, child) =>
-            Directionality(textDirection: TextDirection.rtl, child: child!),
-        home: const DashboardScreen(),
+    child: MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: bloc),
+        BlocProvider.value(value: effectiveThemeBloc),
+      ],
+      child: BlocBuilder<ThemeBloc, ThemeState>(
+        builder: (context, themeState) => MaterialApp(
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeState.mode,
+          builder: (context, child) =>
+              Directionality(textDirection: TextDirection.rtl, child: child!),
+          home: const DashboardScreen(),
+        ),
       ),
     ),
   );
@@ -190,23 +201,25 @@ void main() {
     Navigator.of(tester.element(find.text('افزودن سرشماره بانک'))).pop();
     await tester.pumpAndSettle();
 
-    // Switch to Bank Messages tab and test Jalali date filter sheet.
+    // Switch to Bank Messages tab and test Jalali date filter sheet via calendar icon.
     await tester.tap(find.text('پیامک‌ها').last, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.text('پیامک‌های بانکی'), findsOneWidget);
-    await tester.tap(find.text('همه زمان‌ها'));
+    expect(find.text('همه زمان‌ها'), findsNothing);
+    await tester.tap(find.byIcon(Icons.calendar_month_rounded).last);
     await tester.pumpAndSettle();
     expect(find.text('فیلتر زمانی پیامک‌ها'), findsOneWidget);
     await tester.tap(find.text('امروز'));
     await tester.pumpAndSettle();
     expect(find.text('امروز'), findsWidgets);
 
-    // Switch to Transactions tab, test Jalali date filter sheet, and edit sheet.
+    // Switch to Transactions tab, test Jalali date filter sheet via calendar icon, and edit sheet.
     await tester.tap(find.text('تراکنش‌ها').last, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(TransactionTile), findsOneWidget);
+    expect(find.text('همه زمان‌ها'), findsNothing);
 
-    await tester.tap(find.text('همه زمان‌ها'));
+    await tester.tap(find.byIcon(Icons.calendar_month_rounded).last);
     await tester.pumpAndSettle();
     expect(find.text('فیلتر زمانی تراکنش‌ها'), findsOneWidget);
     await tester.tap(find.text('این ماه').last);
@@ -229,16 +242,41 @@ void main() {
 
     final repo = _TestSmsRepository();
     final bloc = FinanceBloc(repo)..add(const FinanceStarted());
+    final themeBloc = ThemeBloc(initialMode: ThemeMode.light);
     addTearDown(() {
       bloc.close();
+      themeBloc.close();
       repo.dispose();
     });
 
-    await tester.pumpWidget(_buildHarness(bloc, ThemeMode.light));
+    await tester.pumpWidget(
+      _buildHarness(bloc, ThemeMode.light, themeBloc: themeBloc),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(GlassTabBar), findsOneWidget);
     expect(find.byType(BalanceHeaderCard), findsOneWidget);
     expect(find.byType(ExpenseDonut), findsOneWidget);
+
+    // BalanceHeaderCard should be genuinely light in Light mode (dark label ink).
+    final Text lightLabel = tester.widget<Text>(find.text('موجودی کل'));
+    expect(lightLabel.style?.color?.computeLuminance(), lessThan(0.25));
+
+    // Toggle theme from Light -> Dark via the HomeTab header icon button.
+    expect(find.byIcon(Icons.dark_mode_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.dark_mode_rounded));
+    await tester.pumpAndSettle();
+    expect(themeBloc.state.mode, ThemeMode.dark);
+    expect(find.byIcon(Icons.light_mode_rounded), findsOneWidget);
+
+    // BalanceHeaderCard should flip to luminous light ink on dark obsidian card.
+    final Text darkLabel = tester.widget<Text>(find.text('موجودی کل'));
+    expect(darkLabel.style?.color?.computeLuminance(), greaterThan(0.75));
+
+    // Toggle back Dark -> Light.
+    await tester.tap(find.byIcon(Icons.light_mode_rounded));
+    await tester.pumpAndSettle();
+    expect(themeBloc.state.mode, ThemeMode.light);
+    expect(find.byIcon(Icons.dark_mode_rounded), findsOneWidget);
   });
 }

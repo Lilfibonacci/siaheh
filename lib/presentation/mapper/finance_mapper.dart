@@ -17,7 +17,16 @@ import 'package:siaheh/presentation/models/finance_ui_models.dart';
 class FinanceMapper {
   FinanceMapper(this.state);
 
+  static final Expando<FinanceMapper> _cache = Expando<FinanceMapper>();
+
+  /// Returns a cached [FinanceMapper] for an immutable [FinanceState] instance
+  /// so tab switches, search typing, filter taps, and chart interactions never
+  /// recompute O(N) aggregations from scratch.
+  static FinanceMapper of(FinanceState state) =>
+      _cache[state] ??= FinanceMapper(state);
+
   final FinanceState state;
+  final Map<JalaliDateFilter, List<CategoryExpenseSlice>> _breakdownCache = {};
 
   late final DateTime _now = DateTime.now();
   late final DateTime _dayStart = DateTime(_now.year, _now.month, _now.day);
@@ -282,8 +291,11 @@ class FinanceMapper {
       .where((t) => t.type == TransactionType.expense)
       .fold(0, (s, t) => s + t.amountRial);
 
-  /// Aggregated expense slices for [filter], sorted largest-first.
+  /// Aggregated expense slices for [filter], sorted largest-first (cached).
   List<CategoryExpenseSlice> expenseBreakdown(JalaliDateFilter filter) {
+    final cached = _breakdownCache[filter];
+    if (cached != null) return cached;
+
     final txs = transactionsInFilter(filter);
     final amounts = <UiCategory, int>{};
     final counts = <UiCategory, int>{};
@@ -297,7 +309,10 @@ class FinanceMapper {
       total += t.amountRial;
     }
 
-    if (total <= 0) return const [];
+    if (total <= 0) {
+      _breakdownCache[filter] = const [];
+      return const [];
+    }
 
     final slices = [
       for (final e in amounts.entries)
@@ -309,6 +324,7 @@ class FinanceMapper {
         ),
     ]..sort((a, b) => b.amountRial.compareTo(a.amountRial));
 
+    _breakdownCache[filter] = slices;
     return slices;
   }
 

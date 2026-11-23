@@ -5,6 +5,7 @@ import 'package:siaheh/core/theme/siaheh_glass.dart';
 import 'package:siaheh/presentation/bloc/finance_bloc.dart';
 import 'package:siaheh/presentation/bloc/finance_event.dart';
 import 'package:siaheh/presentation/bloc/finance_state.dart';
+import 'package:siaheh/presentation/bloc/theme_bloc.dart';
 import 'package:siaheh/presentation/mapper/finance_mapper.dart';
 import 'package:siaheh/presentation/models/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/account_card.dart';
@@ -62,7 +63,7 @@ class _HomeTabState extends State<HomeTab> {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final FinanceState state = context.watch<FinanceBloc>().state;
-    final FinanceMapper m = FinanceMapper(state);
+    final FinanceMapper m = FinanceMapper.of(state);
     final List<UiAccount> accounts = m.accounts;
     final List<UiTransaction> transactions = m.recentTransactions(5);
     final List<CategoryExpenseSlice> slices = m.expenseBreakdown(_selectedMonth);
@@ -83,12 +84,16 @@ class _HomeTabState extends State<HomeTab> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Row(
                 children: [
-                  GlassContainer(
-                    useOwnLayer: true,
+                  Container(
                     width: 46,
                     height: 46,
-                    shape: const LiquidOval(),
-                    settings: SiahehGlass.cardSettings(theme.brightness),
+                    decoration: SiahehGlass.elevatedGlassDecoration(
+                      context,
+                      radius: 23,
+                      borderColor: theme.colorScheme.primary.withValues(
+                        alpha: 0.35,
+                      ),
+                    ),
                     alignment: Alignment.center,
                     child: Icon(
                       Icons.account_balance_wallet_rounded,
@@ -123,25 +128,25 @@ class _HomeTabState extends State<HomeTab> {
                     width: 44,
                     height: 44,
                     stretch: 0.15,
-                    enabled: !state.syncing,
-                    label: 'بروزرسانی پیامک‌ها',
-                    onTap: () => context.read<FinanceBloc>().add(
-                      const FinanceSyncRequested(),
+                    label: theme.brightness == Brightness.dark
+                        ? 'تغییر به حالت روشن'
+                        : 'تغییر به حالت تیره',
+                    onTap: () => context.read<ThemeBloc>().add(
+                      ThemeToggled(currentBrightness: theme.brightness),
                     ),
-                    child: state.syncing
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.primary,
-                            ),
-                          )
-                        : Icon(
-                            Icons.sync_rounded,
-                            size: 21,
-                            color: theme.colorScheme.onSurface,
-                          ),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: Icon(
+                        theme.brightness == Brightness.dark
+                            ? Icons.light_mode_rounded
+                            : Icons.dark_mode_rounded,
+                        key: ValueKey(theme.brightness),
+                        size: 21,
+                        color: theme.brightness == Brightness.dark
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurface,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -185,15 +190,12 @@ class _HomeTabState extends State<HomeTab> {
             else
               SizedBox(
                 height: 144,
-                child: AdaptiveLiquidGlassLayer(
-                  settings: SiahehGlass.cardSettings(theme.brightness),
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: accounts.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (_, i) => AccountCard(account: accounts[i]),
-                  ),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: accounts.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
+                  itemBuilder: (_, i) => AccountCard(account: accounts[i]),
                 ),
               ),
             if (state.transactions.isNotEmpty) ...[
