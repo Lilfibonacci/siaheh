@@ -1,17 +1,63 @@
-# siaheh
+<div align="center">
+  <img src="assets/icons/app_logo.png" alt="سیاهه" width="128" />
+  <h1>سیاهه | Siaheh</h1>
+  <p>
+    <strong>مدیریت هوشمند و ۱۰۰٪ آفلاین هزینه‌ها و حساب‌های بانکی از روی پیامک‌های بانکی ایران</strong>
+  </p>
+  <p>
+    <em>طراحی مدرن Liquid Glass • پشتیبانی کامل از تقویم شمسی • بدون نیاز به اینترنت و سرور</em>
+  </p>
+</div>
 
-A new Flutter project.
+---
 
-## Getting Started
+## ویژگی‌های اصلی
 
-This project is a starting point for a Flutter application.
+- **۱۰۰٪ آفلاین و امن:** تمام پردازش پیامک‌ها، محاسبه موجودی و ذخیره‌سازی داده‌ها به صورت محلی روی گوشی انجام می‌شود و هیچ اطلاعاتی به سرور ارسال نمی‌شود.
+- **تشخیص خودکار بانک‌ها و حساب‌ها:** پشتیبانی از بانک‌های ایرانی (ملی، ملت، بلوبانک، سامان، پاسارگاد، تجارت، صادرات، رفاه، شهر، سپه، کشاورزی، مسکن و...) با جداسازی دقیق از پیامک‌های تبلیغاتی و اپراتورها.
+- **دسته‌بندی هوشمند هزینه‌ها + همبستگی رمز پویا (OTP):**
+  - تشخیص پذیرنده‌های ایرانی (اسنپ، تپسی، دیجی‌کالا، ایرانسل، همراه اول، کافه و...) از متن تراکنش یا از روی پیامک رمز پویا در بازه زمانی نزدیک به تراکنش.
+  - امکان ساخت دسته‌بندی دلخواه با آیکون و رنگ اختصاصی و یادگیری قوانین برای تراکنش‌های مشابه.
+- **تشخیص خودکار انتقال بین حساب‌ها:** جفت‌سازی هوشمند برداشت و واریز بین حساب‌های خود کاربر (از جمله کارمزد شاپرک) تا در جمع هزینه و درآمد ماهانه تکراری حساب نشود.
+- **نمودار دونات تعاملی و فیلتر کامل شمسی:**
+  - مشاهده تفکیک هزینه‌ها بر اساس دسته‌بندی در هر ماه و سال شمسی دلخواه.
+  - فیلتر زمانی (امروز، ۷ روز اخیر، ماه و سال شمسی) در صفحات تراکنش‌ها و پیامک‌های بانکی.
+- **طراحی Liquid Glass با تم روشن و تاریک:** رابط کاربری شیشه‌ای هماهنگ با ۶۰ فریم بر ثانیه و تغییر سریع بین حالت تیره و روشن.
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## دانلود و نصب
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+از بخش [**Releases**](https://github.com/Lilfibonacci/siaheh/releases) فایل متناسب با گوشی خود را دانلود و نصب کنید:
+
+| فایل | مناسب برای | حجم تقریبی |
+| --- | --- | --- |
+| `app-arm64-v8a-release.apk` | اکثر گوشی‌های اندرویدی جدید (۶۴ بیتی) | ~۲۱ مگابایت |
+| `app-armeabi-v7a-release.apk` | گوشی‌های قدیمی‌تر (۳۲ بیتی) | ~۱۹ مگابایت |
+| `app-x86_64-release.apk` | شبیه‌سازها و دستگاه‌های x86_64 | ~۲۳ مگابایت |
+
+---
+
+## معماری و فناوری‌ها
+
+- **Flutter & Dart** (`sdk: ^3.13.5`)
+- **مدیریت وضعیت:** `flutter_bloc` (استاندارد `Bloc<Event, State>`) + `equatable`
+- **دیتابیس محلی:** `hive_ce` / `hive_ce_flutter`
+- **رابط کاربری:** `liquid_glass_widgets`، `fl_chart`، `lottie`
+- **تقویم و مسیریابی:** `shamsi_date`، `go_router`، `get_it`
+- **خواندن بهینه پیامک در اندروید:** کانال نیتیو کاتلین (`MethodChannel`) روی ترد پس‌زمینه + پردازش دسته‌ای در `Isolate`
+
+---
+
+## اجرا و ساخت پروژه
+
+```bash
+# نصب پکیج‌ها
+flutter pub get
+
+# اجرای تست‌ها و تحلیل ایستا
+flutter analyze && flutter test
+
+# ساخت فایل‌های کم‌حجم Release
+flutter build apk --release --split-per-abi
+```
