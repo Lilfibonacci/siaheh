@@ -20,66 +20,64 @@ class AccountCard extends StatelessWidget {
         ? 'حساب •••• ${PersianFormat.digits(account.last4)}'
         : 'حساب ${PersianFormat.digits(account.last4)}';
 
-    return RepaintBoundary(
-      child: Container(
-        width: 204,
-        padding: const EdgeInsets.all(16),
-        decoration: SiahehGlass.elevatedGlassDecoration(context, radius: 22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                BankLogo(bankKey: account.bank.key, size: 40),
-                const SizedBox(width: 10),
-                Expanded(
+    return SiahehGlassCard(
+      width: 204,
+      radius: 22,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              BankLogo(bankKey: account.bank.key, size: 40),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  account.bank.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurface.withValues(alpha: 0.62),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
                   child: Text(
-                    account.bank.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    PersianFormat.toman(account.balanceRial),
+                    style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurface.withValues(alpha: 0.62),
               ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      PersianFormat.toman(account.balanceRial),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
+              const SizedBox(width: 4),
+              Text(
+                'تومان',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.62),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  'تومان',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.62),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

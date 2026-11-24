@@ -189,23 +189,45 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('انتخاب ماه و سال'), findsNothing);
 
-    // Switch to Senders tab, verify GlassSwitch, and open AddSender glass sheet.
+    // Switch to Senders tab, verify compact GlassSwitch, and open AddSender glass sheet.
     await tester.tap(find.text('منابع').first, warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(find.byType(GlassSwitch), findsOneWidget);
+    final GlassSwitch senderSwitch = tester.widget<GlassSwitch>(
+      find.byType(GlassSwitch),
+    );
+    expect(senderSwitch.width, 42);
+    expect(senderSwitch.height, 21);
 
     await tester.tap(find.text('افزودن سرشماره'));
     await tester.pumpAndSettle();
     expect(find.byType(GlassSheet), findsOneWidget);
+    expect(find.byType(GlassTextField), findsNWidgets(2));
     expect(find.text('افزودن سرشماره بانک'), findsOneWidget);
     Navigator.of(tester.element(find.text('افزودن سرشماره بانک'))).pop();
     await tester.pumpAndSettle();
 
-    // Switch to Bank Messages tab and test Jalali date filter sheet via calendar icon.
+    // Switch to Bank Messages tab and test Jalali date filter sheet & GlassSearchBar.
     await tester.tap(find.text('پیامک‌ها').last, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.text('پیامک‌های بانکی'), findsOneWidget);
+    // Selected GlassChip must use a single uniform glass tint (transparent
+    // selectedColor prevents two-tone nested pill inside horizontal lists).
+    final GlassChip selectedMsgChip = tester.widget<GlassChip>(
+      find.byType(GlassChip).first,
+    );
+    expect(selectedMsgChip.selected, isTrue);
+    expect(selectedMsgChip.selectedColor, Colors.transparent);
+    expect(selectedMsgChip.settings?.glassColor.a ?? 0, greaterThan(0.15));
+    expect(
+      selectedMsgChip.labelStyle?.color != selectedMsgChip.settings?.glassColor,
+      isTrue,
+    );
     expect(find.text('همه زمان‌ها'), findsNothing);
+    await tester.tap(find.byIcon(Icons.search_rounded).last);
+    await tester.pumpAndSettle();
+    expect(find.byType(GlassSearchBar), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.calendar_month_rounded).last);
     await tester.pumpAndSettle();
     expect(find.text('فیلتر زمانی پیامک‌ها'), findsOneWidget);
@@ -217,6 +239,16 @@ void main() {
     await tester.tap(find.text('تراکنش‌ها').last, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(TransactionTile), findsOneWidget);
+    final GlassChip selectedTxChip = tester.widget<GlassChip>(
+      find.byType(GlassChip).first,
+    );
+    expect(selectedTxChip.selected, isTrue);
+    expect(selectedTxChip.selectedColor, Colors.transparent);
+    expect(selectedTxChip.settings?.glassColor.a ?? 0, greaterThan(0.15));
+    expect(
+      selectedTxChip.labelStyle?.color != selectedTxChip.settings?.glassColor,
+      isTrue,
+    );
     expect(find.text('همه زمان‌ها'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.calendar_month_rounded).last);
@@ -229,6 +261,7 @@ void main() {
     await tester.tap(find.byType(TransactionTile));
     await tester.pumpAndSettle();
     expect(find.byType(GlassSheet), findsOneWidget);
+    expect(find.byType(GlassTextField), findsNWidgets(2));
     expect(find.text('ویرایش تراکنش'), findsOneWidget);
   });
 

@@ -74,14 +74,11 @@ class SendersTab extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Container(
+              SiahehGlassCard(
+                radius: 18,
                 padding: const EdgeInsets.all(14),
-                decoration: SiahehGlass.frostedRowDecoration(
-                  context,
-                  radius: 18,
-                  tintColor: scheme.primary,
-                  borderColor: scheme.primary.withValues(alpha: 0.35),
-                ),
+                tintColor: scheme.primary,
+                borderColor: scheme.primary.withValues(alpha: 0.35),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -100,12 +97,12 @@ class SendersTab extends StatelessWidget {
               if (!state.hasPermission)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: FilledButton.icon(
-                    onPressed: () => context.read<FinanceBloc>().add(
+                  child: SiahehPrimaryGlassButton(
+                    onTap: () => context.read<FinanceBloc>().add(
                       const FinancePermissionRequested(),
                     ),
-                    icon: const Icon(Icons.lock_open_rounded),
-                    label: const Text('دادن دسترسی به پیامک'),
+                    icon: Icons.lock_open_rounded,
+                    label: 'دادن دسترسی به پیامک',
                   ),
                 ),
               if (senders.isEmpty)
@@ -123,29 +120,22 @@ class SendersTab extends StatelessWidget {
                   ),
                 ),
               if (senders.isNotEmpty)
-                AdaptiveLiquidGlassLayer(
-                  quality: GlassQuality.standard,
-                  child: Column(
-                    children: [
-                      for (final UiSender sender in senders)
-                        _SenderTile(
-                          sender: sender,
-                          enabled: sender.enabled,
-                          onChanged: (v) {
-                            final entity = state.senders.firstWhere(
-                              (s) => s.number == sender.number,
-                            );
-                            context.read<FinanceBloc>().add(
-                              FinanceSenderToggled(sender: entity, enabled: v),
-                            );
-                          },
-                          onDelete: () => context.read<FinanceBloc>().add(
-                            FinanceSenderDeleted(sender.number),
-                          ),
-                        ),
-                    ],
+                for (final UiSender sender in senders)
+                  _SenderTile(
+                    sender: sender,
+                    enabled: sender.enabled,
+                    onChanged: (v) {
+                      final entity = state.senders.firstWhere(
+                        (s) => s.number == sender.number,
+                      );
+                      context.read<FinanceBloc>().add(
+                        FinanceSenderToggled(sender: entity, enabled: v),
+                      );
+                    },
+                    onDelete: () => context.read<FinanceBloc>().add(
+                      FinanceSenderDeleted(sender.number),
+                    ),
                   ),
-                ),
             ],
           ),
           Positioned(
@@ -203,10 +193,10 @@ class _SenderTile extends StatelessWidget {
     final ColorScheme scheme = theme.colorScheme;
     final bool isDark = theme.brightness == Brightness.dark;
 
-    return Container(
+    return SiahehGlassCard(
+      radius: 20,
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
-      decoration: SiahehGlass.frostedRowDecoration(context, radius: 20),
       child: Row(
         children: [
           BankLogo(bankKey: sender.bank.key, size: 46),
@@ -279,12 +269,12 @@ class _SenderTile extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           GlassSwitch(
-            useOwnLayer: false,
+            useOwnLayer: true,
             quality: GlassQuality.standard,
             value: enabled,
             onChanged: onChanged,
-            width: 54,
-            height: 28,
+            width: 42,
+            height: 21,
             activeColor: scheme.secondary,
             inactiveColor: isDark
                 ? Colors.white.withValues(alpha: 0.18)

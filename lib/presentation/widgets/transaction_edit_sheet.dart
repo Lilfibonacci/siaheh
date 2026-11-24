@@ -267,49 +267,102 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _amount,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'مبلغ (تومان)',
-                prefixIcon: Icon(Icons.payments_outlined),
-                border: OutlineInputBorder(),
+            Text(
+              'مبلغ (تومان)',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.onSurface.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            GlassInteractionSilence(
+              child: GlassTextField(
+                controller: _amount,
+                useOwnLayer: true,
+                quality: GlassQuality.standard,
+                settings: SiahehGlass.inputSettings(theme.brightness),
+                shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+                keyboardType: TextInputType.number,
+                placeholder: 'مثلاً ۲۵۰٬۰۰۰',
+                selectionControls: materialTextSelectionHandleControls,
+                prefixIcon: Icon(
+                  Icons.payments_outlined,
+                  size: 20,
+                  color: scheme.primary,
+                ),
+                textStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+                placeholderStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.48),
+                ),
               ),
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _title,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                labelText: 'عنوان',
-                prefixIcon: Icon(Icons.edit_note_rounded),
-                border: OutlineInputBorder(),
+            Text(
+              'عنوان',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.onSurface.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            GlassInteractionSilence(
+              child: GlassTextField(
+                controller: _title,
+                useOwnLayer: true,
+                quality: GlassQuality.standard,
+                settings: SiahehGlass.inputSettings(theme.brightness),
+                shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+                placeholder: 'عنوان تراکنش یا پذیرنده',
+                selectionControls: materialTextSelectionHandleControls,
+                onChanged: (_) => setState(() {}),
+                prefixIcon: Icon(
+                  Icons.edit_note_rounded,
+                  size: 20,
+                  color: scheme.primary,
+                ),
+                textStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurface,
+                ),
+                placeholderStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.48),
+                ),
               ),
             ),
             const SizedBox(height: 16),
             Text('دسته‌بندی', style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final UiCategory c in categories)
-                  ChoiceChip(
-                    selected: c == _category,
-                    onSelected: (_) => setState(() => _category = c),
-                    avatar: Icon(c.icon, size: 18, color: c.color),
-                    label: Text(c.name),
-                  ),
-                ActionChip(
-                  avatar: Icon(
-                    Icons.add_rounded,
-                    size: 18,
-                    color: AppColors.transfer(theme.brightness),
-                  ),
-                  label: const Text('دسته جدید'),
-                  onPressed: _openCreateCategoryDialog,
+            GlassInteractionSilence(
+              child: GlassBackdropGroup(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 12,
+                  children: [
+                    for (final UiCategory c in categories)
+                      SiahehGlassChip(
+                        selected: c == _category,
+                        accentColor: c.color,
+                        icon: Icon(c.icon, size: 16, color: c.color),
+                        label: c.name,
+                        onTap: () => setState(() => _category = c),
+                      ),
+                    SiahehGlassChip(
+                      selected: false,
+                      accentColor: AppColors.transfer(theme.brightness),
+                      icon: Icon(
+                        Icons.add_rounded,
+                        size: 16,
+                        color: AppColors.transfer(theme.brightness),
+                      ),
+                      label: 'دسته جدید',
+                      labelColor: AppColors.transfer(theme.brightness),
+                      onTap: _openCreateCategoryDialog,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
             if (_canLearnRule) ...[
               const SizedBox(height: 14),
@@ -338,6 +391,7 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
                 GlassInteractionSilence(
                   child: GlassIconButton(
                     useOwnLayer: true,
+                    quality: GlassQuality.standard,
                     size: 50,
                     semanticLabel: 'حذف تراکنش',
                     onPressed: _delete,
@@ -348,15 +402,10 @@ class _TransactionEditSheetState extends State<_TransactionEditSheet> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton(
-                    onPressed: _save,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: const Text('ذخیره تغییرات'),
+                  child: SiahehPrimaryGlassButton(
+                    onTap: _save,
+                    height: 50,
+                    label: 'ذخیره تغییرات',
                   ),
                 ),
               ],
@@ -389,108 +438,162 @@ class _CreateCategoryDialogState extends State<_CreateCategoryDialog> {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
+    final bool canSubmit = _name.text.trim().isNotEmpty;
 
-    return AlertDialog(
-      title: const Text('ساخت دسته‌بندی جدید'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _name,
-              autofocus: true,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: 'نام دسته',
-                hintText: 'مثلاً کافه، آموزش، حیوان خانگی',
-                border: const OutlineInputBorder(),
-                prefixIcon: Icon(_selectedIcon, color: _selectedColor),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('رنگ', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: GlassContainer(
+        useOwnLayer: true,
+        quality: GlassQuality.standard,
+        shape: const LiquidRoundedSuperellipse(borderRadius: 28),
+        settings: SiahehGlass.sheetSettings(theme.brightness),
+        padding: const EdgeInsets.all(20),
+        child: Material(
+          type: MaterialType.transparency,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final Color color in AppCategories.customColorChoices)
-                  GestureDetector(
-                    onTap: () => setState(() => _selectedColor = color),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: _selectedColor == color
-                            ? Border.all(color: scheme.onSurface, width: 2.5)
-                            : null,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text('آیکون', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final IconData icon in AppCategories.customIconChoices)
-                  GestureDetector(
-                    onTap: () => setState(() => _selectedIcon = icon),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: _selectedIcon == icon
-                            ? _selectedColor.withValues(alpha: 0.22)
-                            : scheme.surfaceContainerHighest.withValues(
-                                alpha: 0.5,
-                              ),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _selectedIcon == icon
-                              ? _selectedColor
-                              : scheme.outline,
-                        ),
-                      ),
-                      child: Icon(
-                        icon,
-                        size: 20,
-                        color: _selectedIcon == icon
-                            ? _selectedColor
-                            : scheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('انصراف'),
-        ),
-        FilledButton(
-          onPressed: _name.text.trim().isEmpty
-              ? null
-              : () => Navigator.pop(
-                  context,
-                  CustomCategory(
-                    name: _name.text.trim(),
-                    iconCodePoint: _selectedIcon.codePoint,
-                    colorValue: _selectedColor.toARGB32(),
+                Text(
+                  'ساخت دسته‌بندی جدید',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-          child: const Text('افزودن'),
+                const SizedBox(height: 14),
+                GlassTextField(
+                  controller: _name,
+                  autofocus: true,
+                  useOwnLayer: true,
+                  quality: GlassQuality.standard,
+                  settings: SiahehGlass.inputSettings(theme.brightness),
+                  shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+                  placeholder: 'مثلاً کافه، آموزش، حیوان خانگی',
+                  selectionControls: materialTextSelectionHandleControls,
+                  onChanged: (_) => setState(() {}),
+                  prefixIcon: Icon(_selectedIcon, color: _selectedColor),
+                  textStyle: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurface,
+                  ),
+                  placeholderStyle: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurface.withValues(alpha: 0.48),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text('رنگ', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (final Color color in AppCategories.customColorChoices)
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedColor = color),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: _selectedColor == color
+                                ? Border.all(
+                                    color: scheme.onSurface,
+                                    width: 2.5,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text('آیکون', style: theme.textTheme.labelLarge),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final IconData icon in AppCategories.customIconChoices)
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedIcon = icon),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: _selectedIcon == icon
+                                ? _selectedColor.withValues(alpha: 0.22)
+                                : scheme.surfaceContainerHighest.withValues(
+                                    alpha: 0.5,
+                                  ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _selectedIcon == icon
+                                  ? _selectedColor
+                                  : scheme.outline,
+                            ),
+                          ),
+                          child: Icon(
+                            icon,
+                            size: 20,
+                            color: _selectedIcon == icon
+                                ? _selectedColor
+                                : scheme.onSurface.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: GlassButton.custom(
+                        useOwnLayer: true,
+                        quality: GlassQuality.standard,
+                        height: 46,
+                        stretch: 0.14,
+                        shape: const LiquidRoundedSuperellipse(
+                          borderRadius: 16,
+                        ),
+                        label: 'انصراف',
+                        onTap: () => Navigator.pop(context),
+                        child: Text(
+                          'انصراف',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: scheme.onSurface.withValues(alpha: 0.78),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: SiahehPrimaryGlassButton(
+                        label: 'افزودن',
+                        height: 46,
+                        enabled: canSubmit,
+                        onTap: () {
+                          if (!canSubmit) return;
+                          Navigator.pop(
+                            context,
+                            CustomCategory(
+                              name: _name.text.trim(),
+                              iconCodePoint: _selectedIcon.codePoint,
+                              colorValue: _selectedColor.toARGB32(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-      ],
+      ),
     );
   }
 }

@@ -174,11 +174,13 @@ class _TransactionsTabState extends State<TransactionsTab> {
                     ),
                   ),
                 ),
-                AdaptiveLiquidGlassLayer(
+                GlassBackdropGroup(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GlassButton.custom(
+                        useOwnLayer: true,
+                        quality: GlassQuality.standard,
                         width: 44,
                         height: 44,
                         stretch: 0.15,
@@ -197,6 +199,8 @@ class _TransactionsTabState extends State<TransactionsTab> {
                       ),
                       const SizedBox(width: 8),
                       GlassButton.custom(
+                        useOwnLayer: true,
+                        quality: GlassQuality.standard,
                         width: 44,
                         height: 44,
                         stretch: 0.15,
@@ -223,14 +227,16 @@ class _TransactionsTabState extends State<TransactionsTab> {
           ),
           if (activeCategoryUi != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 2),
-              child: InputChip(
-                avatar: Icon(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: SiahehGlassChip(
+                selected: true,
+                accentColor: activeCategoryUi.color,
+                icon: Icon(
                   activeCategoryUi.icon,
-                  size: 18,
+                  size: 16,
                   color: activeCategoryUi.color,
                 ),
-                label: Text('دسته: ${activeCategoryUi.name}'),
+                label: 'دسته: ${activeCategoryUi.name}',
                 onDeleted: () {
                   setState(() => _filter = _Filter.all);
                   widget.onClearCategoryFilter?.call();
@@ -239,88 +245,105 @@ class _TransactionsTabState extends State<TransactionsTab> {
             ),
           if (_searching)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-              child: TextField(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: GlassSearchBar(
                 controller: _search,
                 autofocus: true,
+                useOwnLayer: true,
+                quality: GlassQuality.standard,
+                settings: SiahehGlass.inputSettings(theme.brightness),
+                placeholder: 'جستجو در عنوان، پذیرنده، بانک یا متن پیامک...',
+                searchIconColor: scheme.onSurface.withValues(alpha: 0.65),
+                clearIconColor: scheme.onSurface.withValues(alpha: 0.65),
+                textStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurface,
+                ),
+                placeholderStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.52),
+                ),
                 onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: 'جستجو در عنوان، پذیرنده، بانک یا متن پیامک...',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
+              ),
+            ),
+          if (banks.length > 1) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 38,
+              child: GlassBackdropGroup(
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  children: [
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: _GlassFilterChip(
+                          label: 'همه بانک‌ها',
+                          selected: _bankFilter == null,
+                          onTap: () => setState(() => _bankFilter = null),
+                        ),
+                      ),
+                    ),
+                    for (final UiBank b in banks)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: _GlassFilterChip(
+                            leading: BankLogo(bankKey: b.key, size: 18),
+                            label: b.name,
+                            selected: _bankFilter == b.key,
+                            onTap: () => setState(() => _bankFilter = b.key),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
-          if (banks.length > 1)
-            SizedBox(
-              height: 50,
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 38,
+            child: GlassBackdropGroup(
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: ChoiceChip(
-                      label: const Text('همه بانک‌ها'),
-                      selected: _bankFilter == null,
-                      onSelected: (_) => setState(() => _bankFilter = null),
+                  if (_dateFilter.isActive) ...[
+                    Center(
+                      child: JalaliDateFilterChip(
+                        filter: _dateFilter,
+                        onTap: () => _openDateFilterPicker(mapper),
+                        onClear: () => setState(
+                          () => _dateFilter = const JalaliDateFilter.all(),
+                        ),
+                      ),
                     ),
-                  ),
-                  for (final UiBank b in banks)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: ChoiceChip(
-                        avatar: BankLogo(bankKey: b.key, size: 22),
-                        label: Text(b.name),
-                        selected: _bankFilter == b.key,
-                        onSelected: (_) => setState(() => _bankFilter = b.key),
+                    const SizedBox(width: 8),
+                  ],
+                  for (final _Filter f in _Filter.values)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: _GlassFilterChip(
+                          label: _labels[f]!,
+                          selected: _filter == f,
+                          onTap: () => setState(() => _filter = f),
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
-          SizedBox(
-            height: 52,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              children: [
-                if (_dateFilter.isActive) ...[
-                  JalaliDateFilterChip(
-                    filter: _dateFilter,
-                    onTap: () => _openDateFilterPicker(mapper),
-                    onClear: () => setState(
-                      () => _dateFilter = const JalaliDateFilter.all(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                for (final _Filter f in _Filter.values)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: ChoiceChip(
-                      label: Text(_labels[f]!),
-                      selected: _filter == f,
-                      onSelected: (_) => setState(() => _filter = f),
-                    ),
-                  ),
-              ],
-            ),
           ),
+          const SizedBox(height: 12),
           if (hasSummaryFilter && items.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
-              child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: SiahehGlassCard(
+                radius: 16,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 10,
-                ),
-                decoration: SiahehGlass.frostedRowDecoration(
-                  context,
-                  radius: 16,
                 ),
                 child: Row(
                   children: [
@@ -439,6 +462,30 @@ class _TransactionsTabState extends State<TransactionsTab> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GlassFilterChip extends StatelessWidget {
+  const _GlassFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.leading,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    return SiahehGlassChip(
+      icon: leading,
+      label: label,
+      selected: selected,
+      onTap: onTap,
     );
   }
 }

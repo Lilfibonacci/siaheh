@@ -475,7 +475,7 @@ class _QuickPill extends StatelessWidget {
   }
 }
 
-/// Compact reusable filter pill placed in Transactions & Bank Messages tabs
+/// Compact Liquid Glass filter chip placed in Transactions & Bank Messages tabs
 /// to display and edit/clear the active [JalaliDateFilter].
 class JalaliDateFilterChip extends StatelessWidget {
   const JalaliDateFilterChip({
@@ -493,79 +493,19 @@ class JalaliDateFilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
-    final bool isDark = theme.brightness == Brightness.dark;
     final bool active = filter.isActive;
 
-    return Material(
-      color: active
-          ? scheme.primary.withValues(alpha: isDark ? 0.22 : 0.16)
-          : (isDark
-              ? Colors.white.withValues(alpha: 0.06)
-              : Colors.white.withValues(alpha: 0.72)),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: active
-              ? scheme.primary.withValues(alpha: 0.75)
-              : (isDark
-                  ? Colors.white.withValues(alpha: 0.12)
-                  : scheme.outline.withValues(alpha: 0.9)),
-        ),
+    return SiahehGlassChip(
+      label: filter.label,
+      selected: active,
+      accentColor: scheme.primary,
+      icon: Icon(
+        Icons.calendar_month_rounded,
+        size: 15,
+        color: active ? scheme.primary : scheme.onSurface.withValues(alpha: 0.78),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsetsDirectional.fromSTEB(
-            12,
-            6,
-            active && onClear != null ? 6 : 10,
-            6,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.calendar_month_rounded,
-                size: 16,
-                color: active
-                    ? scheme.primary
-                    : scheme.onSurface.withValues(alpha: 0.75),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                filter.label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w600,
-                  color: active ? scheme.primary : scheme.onSurface,
-                ),
-              ),
-              if (active && onClear != null) ...[
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: onClear,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Icon(
-                      Icons.close_rounded,
-                      size: 15,
-                      color: scheme.primary,
-                    ),
-                  ),
-                ),
-              ] else ...[
-                const SizedBox(width: 2),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 16,
-                  color: scheme.onSurface.withValues(alpha: 0.6),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+      onTap: onTap,
+      onDeleted: active ? onClear : null,
     );
   }
 }

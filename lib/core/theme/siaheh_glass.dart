@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:siaheh/core/theme/app_colors.dart';
 
-/// Centralized Liquid Glass design tokens, presets, and ambient backdrop
-/// tailored for Siaheh's obsidian-gold-emerald (dark) and luminous
-/// ivory-champagne (light) financial identity, tuned for smooth 60/120fps
-/// scrolling on Android Vulkan/Impeller.
+/// Centralized Liquid Glass design tokens, presets, reusable glass primitives,
+/// and ambient backdrop tailored for Siaheh's obsidian-gold-emerald (dark) and
+/// luminous ivory-champagne (light) financial identity at smooth 60/120fps.
 class SiahehGlass {
   SiahehGlass._();
 
@@ -15,10 +14,6 @@ class SiahehGlass {
   static const double floatingNavBottomInset = 116.0;
 
   /// App-wide [GlassThemeData] passed to [LiquidGlassWidgets.wrap].
-  ///
-  /// Uses single-pass blur (`frost: 0`) rather than double-pass wide Gaussian
-  /// frost to eliminate tile-memory stalls on mobile GPUs while keeping the
-  /// iOS 27 specular rim, lens refraction, and jelly physics intact.
   static final GlassThemeData themeData = GlassThemeData(
     style: GlassStyle.ios27,
     dark: GlassThemeVariant(
@@ -56,9 +51,6 @@ class SiahehGlass {
   );
 
   /// Refractive settings for the primary [BalanceHeaderCard] hero surface.
-  ///
-  /// Uses a light blur radius because [SiahehAmbientBackground] behind it is
-  /// already a soft radial gradient, saving significant GPU bandwidth on scroll.
   static LiquidGlassSettings heroCardSettings(Brightness brightness) {
     final bool isDark = brightness == Brightness.dark;
     if (isDark) {
@@ -86,6 +78,113 @@ class SiahehGlass {
       ambientStrength: 0.10,
       fresnelStrength: 0.25,
       rimLight: 0.90,
+    );
+  }
+
+  /// Real Liquid Glass shader settings for scrollable cards (`AccountCard`,
+  /// `ExpenseDonut` card, `TransactionTile`, `_BankMessageCard`, `_SenderTile`).
+  ///
+  /// Uses `blur: 0, frost: 0` on `GlassQuality.standard` so `LightweightLiquidGlass`
+  /// runs the real SDF specular rim + Fresnel + glass body tint shader directly
+  /// on the canvas without pushing a per-row `BackdropFilterLayer` flush.
+  static LiquidGlassSettings scrollCardSettings(
+    Brightness brightness, {
+    Color? tintColor,
+  }) {
+    final bool isDark = brightness == Brightness.dark;
+    if (isDark) {
+      return LiquidGlassSettings(
+        glassColor: tintColor != null
+            ? tintColor.withValues(alpha: 0.16)
+            : const Color(0x9C1A2126),
+        blur: 0,
+        frost: 0,
+        thickness: 18,
+        refractiveIndex: 1.18,
+        saturation: 1.22,
+        lightIntensity: 0.32,
+        ambientStrength: 0.10,
+        fresnelStrength: 0.28,
+        rimLight: 0.62,
+      );
+    }
+    return LiquidGlassSettings(
+      glassColor: tintColor != null
+          ? tintColor.withValues(alpha: 0.14)
+          : const Color(0xCCFFFFFF),
+      blur: 0,
+      frost: 0,
+      thickness: 18,
+      refractiveIndex: 1.18,
+      saturation: 1.30,
+      lightIntensity: 0.26,
+      ambientStrength: 0.10,
+      fresnelStrength: 0.24,
+      rimLight: 0.92,
+    );
+  }
+
+  /// Balanced Liquid Glass settings for chips inside [GlassBackdropGroup].
+  static LiquidGlassSettings chipSettings(
+    Brightness brightness, {
+    bool selected = false,
+    Color? accent,
+  }) {
+    final bool isDark = brightness == Brightness.dark;
+    final Color effectiveAccent =
+        accent ?? (isDark ? AppColors.goldDarkTheme : AppColors.goldLightTheme);
+    if (isDark) {
+      return LiquidGlassSettings(
+        glassColor: selected
+            ? effectiveAccent.withValues(alpha: 0.34)
+            : const Color(0x301E262B),
+        blur: 4,
+        frost: 0,
+        thickness: 16,
+        refractiveIndex: 1.18,
+        saturation: 1.25,
+        lightIntensity: 0.24,
+        rimLight: selected ? 0.78 : 0.48,
+      );
+    }
+    return LiquidGlassSettings(
+      glassColor: selected
+          ? effectiveAccent.withValues(alpha: 0.22)
+          : const Color(0xB8FFFFFF),
+      blur: 4,
+      frost: 0,
+      thickness: 16,
+      refractiveIndex: 1.18,
+      saturation: 1.35,
+      lightIntensity: 0.20,
+      rimLight: selected ? 0.92 : 0.80,
+    );
+  }
+
+  /// Liquid Glass settings for [GlassSearchBar] and [GlassTextField].
+  static LiquidGlassSettings inputSettings(Brightness brightness) {
+    final bool isDark = brightness == Brightness.dark;
+    if (isDark) {
+      return const LiquidGlassSettings(
+        glassColor: Color(0x45182024),
+        blur: 6,
+        frost: 0,
+        thickness: 18,
+        refractiveIndex: 1.18,
+        saturation: 1.25,
+        lightIntensity: 0.24,
+        rimLight: 0.60,
+      );
+    }
+    return const LiquidGlassSettings(
+      glassColor: Color(0xC8FFFFFF),
+      blur: 6,
+      frost: 0,
+      thickness: 18,
+      refractiveIndex: 1.18,
+      saturation: 1.35,
+      lightIntensity: 0.22,
+      rimLight: 0.88,
     );
   }
 
@@ -118,7 +217,7 @@ class SiahehGlass {
     );
   }
 
-  /// High-legibility frosted glass settings for modal [GlassSheet] surfaces.
+  /// High-legibility frosted glass settings for modal [GlassSheet] & [GlassDialog].
   static LiquidGlassSettings sheetSettings(Brightness brightness) {
     final bool isDark = brightness == Brightness.dark;
     if (isDark) {
@@ -170,110 +269,219 @@ class SiahehGlass {
       rimLight: 1.0,
     );
   }
+}
 
-  /// Zero-BackdropFilter elevated glass surface for scrollable content cards
-  /// (`AccountCard`, `ExpenseDonut` card) sitting over the already-soft
-  /// [SiahehAmbientBackground]. Visually cohesive with refractive glass while
-  /// eliminating per-card GPU backdrop passes during scroll.
-  static BoxDecoration elevatedGlassDecoration(
-    BuildContext context, {
-    double radius = 24,
-    Color? borderColor,
-  }) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    if (isDark) {
-      return BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        gradient: const LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            Color(0xCC222A2F),
-            Color(0xB8181E22),
-            Color(0xC413191C),
+/// Real Liquid Glass card container running the lightweight SDF specular shader
+/// at 60/120fps without per-row `BackdropFilter` stalls.
+class SiahehGlassCard extends StatelessWidget {
+  const SiahehGlassCard({
+    super.key,
+    required this.child,
+    this.radius = 20,
+    this.padding,
+    this.margin,
+    this.width,
+    this.height,
+    this.borderColor,
+    this.tintColor,
+    this.shape,
+  });
+
+  final Widget child;
+  final double radius;
+  final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
+  final double? width;
+  final double? height;
+  final Color? borderColor;
+  final Color? tintColor;
+  final LiquidShape? shape;
+
+  @override
+  Widget build(BuildContext context) {
+    final Brightness brightness = Theme.of(context).brightness;
+    final bool isDark = brightness == Brightness.dark;
+    final LiquidShape effectiveShape =
+        shape ?? LiquidRoundedSuperellipse(borderRadius: radius);
+
+    final Widget card = RepaintBoundary(
+      child: GlassContainer(
+        useOwnLayer: true,
+        quality: GlassQuality.standard,
+        width: width,
+        height: height,
+        shape: effectiveShape,
+        settings: SiahehGlass.scrollCardSettings(
+          brightness,
+          tintColor: tintColor,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: shape is LiquidOval
+                ? null
+                : BorderRadius.circular(radius),
+            shape: shape is LiquidOval ? BoxShape.circle : BoxShape.rectangle,
+            border: Border.all(
+              color: borderColor ??
+                  (isDark
+                      ? Colors.white.withValues(alpha: 0.11)
+                      : Colors.white.withValues(alpha: 0.88)),
+              width: 1,
+            ),
+          ),
+          child: padding != null
+              ? Padding(padding: padding!, child: child)
+              : child,
+        ),
+      ),
+    );
+
+    if (margin != null) {
+      return Padding(padding: margin!, child: card);
+    }
+    return card;
+  }
+}
+
+/// Primary Liquid Glass CTA button replacing Material [FilledButton] across
+/// Siaheh with consistent gold-tinted glass physics and high contrast.
+class SiahehPrimaryGlassButton extends StatelessWidget {
+  const SiahehPrimaryGlassButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.enabled = true,
+    this.height = 50,
+    this.fullWidth = true,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final IconData? icon;
+  final bool enabled;
+  final double height;
+  final bool fullWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+
+    final Widget button = GlassButton.custom(
+      useOwnLayer: true,
+      quality: GlassQuality.standard,
+      width: fullWidth ? double.infinity : null,
+      height: height,
+      stretch: 0.14,
+      enabled: enabled,
+      label: label,
+      shape: const LiquidRoundedSuperellipse(borderRadius: 18),
+      tintColor: scheme.primary.withValues(alpha: isDark ? 0.30 : 0.22),
+      glowColor: scheme.primary.withValues(alpha: 0.32),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        child: Row(
+          mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 19,
+                color: isDark ? scheme.primary : AppColors.lightTextPrimary,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? scheme.primary : AppColors.lightTextPrimary,
+                ),
+              ),
+            ),
           ],
         ),
-        border: Border.all(
-          color: borderColor ?? Colors.white.withValues(alpha: 0.13),
-          width: 1,
-        ),
-      );
-    }
-    return BoxDecoration(
-      borderRadius: BorderRadius.circular(radius),
-      gradient: const LinearGradient(
-        begin: Alignment.topRight,
-        end: Alignment.bottomLeft,
-        colors: [
-          Color(0xEBFFFFFF),
-          Color(0xD8FCFBF8),
-          Color(0xD4F6F3EC),
-        ],
       ),
-      border: Border.all(
-        color: borderColor ?? Colors.white.withValues(alpha: 0.95),
-        width: 1.1,
-      ),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x0A121417),
-          blurRadius: 10,
-          offset: Offset(0, 4),
-        ),
-      ],
     );
-  }
 
-  /// Lightweight 60fps frosted glass-matched surface decoration for long
-  /// scrollable lists (`TransactionTile`, `_BankMessageCard`, `_SenderTile`).
-  static BoxDecoration frostedRowDecoration(
-    BuildContext context, {
-    double radius = 20,
-    Color? borderColor,
-    Color? tintColor,
-  }) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    if (isDark) {
-      return BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: tintColor != null
-              ? [
-                  tintColor.withValues(alpha: 0.16),
-                  const Color(0xB3151B1E),
-                ]
-              : const [
-                  Color(0xC21D2428),
-                  Color(0xA614191C),
-                ],
-        ),
-        border: Border.all(
-          color: borderColor ?? Colors.white.withValues(alpha: 0.10),
-          width: 1,
-        ),
-      );
-    }
-    return BoxDecoration(
-      borderRadius: BorderRadius.circular(radius),
-      gradient: LinearGradient(
-        begin: Alignment.topRight,
-        end: Alignment.bottomLeft,
-        colors: tintColor != null
-            ? [
-                tintColor.withValues(alpha: 0.14),
-                const Color(0xE0FFFFFF),
-              ]
-            : const [
-                Color(0xE6FFFFFF),
-                Color(0xCCF7F5F0),
-              ],
+    return GlassInteractionSilence(child: button);
+  }
+}
+
+/// Shared translucent Liquid Glass filter/selection chip with guaranteed contrast
+/// in both Dark and Light themes (avoids opaque [GlassChip.selectedColor]
+/// fills that would hide the label).
+class SiahehGlassChip extends StatelessWidget {
+  const SiahehGlassChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    this.onTap,
+    this.onDeleted,
+    this.icon,
+    this.deleteIcon,
+    this.accentColor,
+    this.labelColor,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+  final VoidCallback? onDeleted;
+  final Widget? icon;
+  final Widget? deleteIcon;
+  final Color? accentColor;
+  final Color? labelColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+    final Color accent = accentColor ?? scheme.primary;
+
+    final Color resolvedTextColor = labelColor ??
+        (selected
+            ? (isDark
+                ? Color.lerp(accent, Colors.white, 0.35)!
+                : AppColors.lightTextPrimary)
+            : scheme.onSurface.withValues(alpha: 0.86));
+
+    return GlassChip(
+      useOwnLayer: true,
+      quality: GlassQuality.standard,
+      settings: SiahehGlass.chipSettings(
+        theme.brightness,
+        selected: selected,
+        accent: accent,
       ),
-      border: Border.all(
-        color: borderColor ?? AppColors.lightBorder.withValues(alpha: 0.85),
-        width: 1,
+      icon: icon,
+      iconSize: 16,
+      iconColor: isDark ? Color.lerp(accent, Colors.white, 0.25) : accent,
+      label: label,
+      selected: selected,
+      selectedColor: Colors.transparent,
+      labelStyle: theme.textTheme.labelMedium?.copyWith(
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+        color: resolvedTextColor,
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+      stretch: 0.15,
+      onTap: onTap,
+      onDeleted: onDeleted,
+      deleteIcon: deleteIcon ??
+          Icon(
+            Icons.close_rounded,
+            size: 15,
+            color: isDark ? Color.lerp(accent, Colors.white, 0.35) : accent,
+          ),
     );
   }
 }
@@ -307,8 +515,8 @@ class SiahehAmbientBackground extends StatelessWidget {
                   child: _AmbientOrb(
                     size: 320,
                     color: isDark
-                        ? AppColors.goldDarkTheme.withValues(alpha: 0.20)
-                        : const Color(0xFFE7C776).withValues(alpha: 0.34),
+                        ? AppColors.goldDarkTheme.withValues(alpha: 0.22)
+                        : const Color(0xFFE7C776).withValues(alpha: 0.36),
                   ),
                 ),
                 // Mid-left deep emerald aura (behind accounts & expense donut)
@@ -318,8 +526,8 @@ class SiahehAmbientBackground extends StatelessWidget {
                   child: _AmbientOrb(
                     size: 340,
                     color: isDark
-                        ? AppColors.emeraldDark.withValues(alpha: 0.17)
-                        : const Color(0xFF6EE7B7).withValues(alpha: 0.24),
+                        ? AppColors.emeraldDark.withValues(alpha: 0.18)
+                        : const Color(0xFF6EE7B7).withValues(alpha: 0.26),
                   ),
                 ),
                 // Bottom-right soft champagne-teal aura (refracted by bottom dock)
@@ -329,8 +537,8 @@ class SiahehAmbientBackground extends StatelessWidget {
                   child: _AmbientOrb(
                     size: 320,
                     color: isDark
-                        ? const Color(0xFF1E5B4C).withValues(alpha: 0.24)
-                        : const Color(0xFFD9C28B).withValues(alpha: 0.26),
+                        ? const Color(0xFF1E5B4C).withValues(alpha: 0.25)
+                        : const Color(0xFFD9C28B).withValues(alpha: 0.28),
                   ),
                 ),
                 // Subtle bottom-left gold kiss for dock symmetry
@@ -340,8 +548,8 @@ class SiahehAmbientBackground extends StatelessWidget {
                   child: _AmbientOrb(
                     size: 240,
                     color: isDark
-                        ? AppColors.goldDarkTheme.withValues(alpha: 0.12)
-                        : const Color(0xFFA7F3D0).withValues(alpha: 0.22),
+                        ? AppColors.goldDarkTheme.withValues(alpha: 0.14)
+                        : const Color(0xFFA7F3D0).withValues(alpha: 0.24),
                   ),
                 ),
               ],

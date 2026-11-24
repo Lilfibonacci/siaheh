@@ -129,12 +129,9 @@ class _ExpenseDonutState extends State<ExpenseDonut> {
             ],
           ),
           const SizedBox(height: 12),
-          Container(
+          SiahehGlassCard(
+            radius: 26,
             padding: const EdgeInsets.all(16),
-            decoration: SiahehGlass.elevatedGlassDecoration(
-              context,
-              radius: 26,
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

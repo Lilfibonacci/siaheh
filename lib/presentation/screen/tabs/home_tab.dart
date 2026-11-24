@@ -84,21 +84,19 @@ class _HomeTabState extends State<HomeTab> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Row(
                 children: [
-                  Container(
+                  SiahehGlassCard(
                     width: 46,
                     height: 46,
-                    decoration: SiahehGlass.elevatedGlassDecoration(
-                      context,
-                      radius: 23,
-                      borderColor: theme.colorScheme.primary.withValues(
-                        alpha: 0.35,
-                      ),
+                    shape: const LiquidOval(),
+                    borderColor: theme.colorScheme.primary.withValues(
+                      alpha: 0.35,
                     ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: theme.colorScheme.primary,
-                      size: 22,
+                    child: Center(
+                      child: Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 22,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -154,12 +152,12 @@ class _HomeTabState extends State<HomeTab> {
             if (!state.hasPermission)
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: FilledButton.icon(
-                  onPressed: () => context.read<FinanceBloc>().add(
+                child: SiahehPrimaryGlassButton(
+                  onTap: () => context.read<FinanceBloc>().add(
                     const FinancePermissionRequested(),
                   ),
-                  icon: const Icon(Icons.lock_open_rounded),
-                  label: const Text('دادن دسترسی پیامک برای تشخیص خودکار بانک‌ها'),
+                  icon: Icons.lock_open_rounded,
+                  label: 'دادن دسترسی پیامک برای تشخیص خودکار بانک‌ها',
                 ),
               ),
             BalanceHeaderCard(
@@ -175,12 +173,9 @@ class _HomeTabState extends State<HomeTab> {
             if (accounts.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
+                child: SiahehGlassCard(
+                  radius: 20,
                   padding: const EdgeInsets.all(18),
-                  decoration: SiahehGlass.frostedRowDecoration(
-                    context,
-                    radius: 20,
-                  ),
                   child: Text(
                     'هنوز حساب بانکی شناسایی نشده است. پس از دادن دسترسی پیامک، تمام بانک‌های شما به صورت خودکار تشخیص داده می‌شوند.',
                     style: theme.textTheme.bodySmall?.copyWith(height: 1.7),

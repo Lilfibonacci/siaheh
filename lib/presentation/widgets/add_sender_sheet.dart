@@ -66,6 +66,8 @@ class _AddSenderSheetState extends State<_AddSenderSheet> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final bool canSubmit = _number.text.trim().isNotEmpty && _bankKey != null;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -78,75 +80,111 @@ class _AddSenderSheetState extends State<_AddSenderSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-            Text('افزودن سرشماره بانک', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 6),
-            Text(
-              'سرشماره عددی (مثلاً +9830007100) یا شناسه حروفی بانک (مثلاً BluBank) را وارد کنید.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
+          Text('افزودن سرشماره بانک', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            'سرشماره عددی (مثلاً +9830007100) یا شناسه حروفی بانک (مثلاً BluBank) را وارد کنید.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurface.withValues(alpha: 0.62),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _number,
-              onChanged: (_) => setState(() {}),
-              keyboardType: TextInputType.text,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'سرشماره یا شناسه فرستنده',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: scheme.onSurface.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          GlassInteractionSilence(
+            child: Directionality(
               textDirection: TextDirection.ltr,
-              decoration: const InputDecoration(
-                labelText: 'سرشماره یا شناسه فرستنده',
-                hintText: 'BluBank یا +9830007100',
-                prefixIcon: Icon(Icons.sms_outlined),
-                border: OutlineInputBorder(),
+              child: GlassTextField(
+                controller: _number,
+                useOwnLayer: true,
+                quality: GlassQuality.standard,
+                settings: SiahehGlass.inputSettings(theme.brightness),
+                shape: const LiquidRoundedSuperellipse(borderRadius: 16),
+                keyboardType: TextInputType.text,
+                placeholder: 'BluBank / +9830007100',
+                selectionControls: materialTextSelectionHandleControls,
+                onChanged: (_) => setState(() {}),
+                prefixIcon: Icon(
+                  Icons.sms_outlined,
+                  size: 20,
+                  color: scheme.primary,
+                ),
+                textStyle: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurface,
+                ),
+                placeholderStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurface.withValues(alpha: 0.48),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'نام بانک',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: scheme.onSurface.withValues(alpha: 0.72),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          GlassInteractionSilence(
+            child: GlassTextField(
               controller: _bankName,
+              useOwnLayer: true,
+              quality: GlassQuality.standard,
+              settings: SiahehGlass.inputSettings(theme.brightness),
+              shape: const LiquidRoundedSuperellipse(borderRadius: 16),
               textInputAction: TextInputAction.done,
+              placeholder: 'مثلاً ملی، ملت، بلوبانک، پاسارگاد',
+              selectionControls: materialTextSelectionHandleControls,
               onChanged: (v) =>
                   setState(() => _bankKey = BankIconResolver.resolve(v)),
-              decoration: InputDecoration(
-                labelText: 'نام بانک',
-                hintText: 'مثلاً ملی، ملت، بلوبانک، پاسارگاد',
-                border: const OutlineInputBorder(),
-                prefixIcon: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: _bankKey == null
-                      ? const Icon(Icons.account_balance_rounded)
-                      : BankLogo(
-                          key: ValueKey(_bankKey),
-                          bankKey: _bankKey!,
-                          size: 32,
-                        ),
-                ),
+              prefixIcon: _bankKey == null
+                  ? Icon(
+                      Icons.account_balance_rounded,
+                      size: 20,
+                      color: scheme.primary,
+                    )
+                  : BankLogo(
+                      key: ValueKey(_bankKey),
+                      bankKey: _bankKey!,
+                      size: 26,
+                    ),
+              textStyle: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurface,
+              ),
+              placeholderStyle: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurface.withValues(alpha: 0.48),
               ),
             ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _number.text.trim().isEmpty || _bankKey == null
-                  ? null
-                  : () {
-                      context.read<FinanceBloc>().add(
-                        FinanceSenderAdded(
-                          SmsSender(
-                            number: _number.text.trim(),
-                            bankKey: _bankKey!,
-                            autoDetected: false,
-                          ),
-                        ),
-                      );
-                      Navigator.pop(context);
-                    },
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
+          ),
+          const SizedBox(height: 22),
+          SiahehPrimaryGlassButton(
+            label: 'افزودن',
+            enabled: canSubmit,
+            height: 50,
+            onTap: () {
+              if (!canSubmit) return;
+              context.read<FinanceBloc>().add(
+                FinanceSenderAdded(
+                  SmsSender(
+                    number: _number.text.trim(),
+                    bankKey: _bankKey!,
+                    autoDetected: false,
+                  ),
                 ),
-              ),
-              child: const Text('افزودن'),
-            ),
-          ],
-        ),
-      );
+              );
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

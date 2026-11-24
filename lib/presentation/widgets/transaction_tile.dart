@@ -23,14 +23,11 @@ class TransactionTile extends StatelessWidget {
       UiTxType.transfer => (AppColors.transfer(theme.brightness), ''),
     };
 
-    return Container(
-      decoration: SiahehGlass.frostedRowDecoration(
-        context,
-        radius: 20,
-        borderColor: tx.needsReview
-            ? scheme.primary.withValues(alpha: 0.55)
-            : null,
-      ),
+    return SiahehGlassCard(
+      radius: 20,
+      borderColor: tx.needsReview
+          ? scheme.primary.withValues(alpha: 0.55)
+          : null,
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
