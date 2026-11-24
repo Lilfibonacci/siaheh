@@ -11,6 +11,27 @@
 
 ---
 
+## پیش‌نمایش (Screenshots)
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><strong>خانه (تم تیره)</strong></td>
+      <td align="center"><strong>خانه (تم روشن)</strong></td>
+      <td align="center"><strong>تراکنش‌ها</strong></td>
+      <td align="center"><strong>پیامک‌های بانکی</strong></td>
+    </tr>
+    <tr>
+      <td><img src="docs/screenshots/home_dark.png" alt="صفحه خانه - تم تیره" width="210" /></td>
+      <td><img src="docs/screenshots/home_light.png" alt="صفحه خانه - تم روشن" width="210" /></td>
+      <td><img src="docs/screenshots/transactions_dark.png" alt="صفحه تراکنش‌ها" width="210" /></td>
+      <td><img src="docs/screenshots/messages_dark.png" alt="صفحه پیامک‌های بانکی" width="210" /></td>
+    </tr>
+  </table>
+</div>
+
+---
+
 ## ویژگی‌های اصلی
 
 - **۱۰۰٪ آفلاین و امن:** تمام پردازش پیامک‌ها، محاسبه موجودی و ذخیره‌سازی داده‌ها به صورت محلی روی گوشی انجام می‌شود و هیچ اطلاعاتی به سرور ارسال نمی‌شود.
@@ -61,3 +82,27 @@ flutter analyze && flutter test
 # ساخت فایل‌های کم‌حجم Release
 flutter build apk --release --split-per-abi
 ```
+
+---
+
+## مشارکت در توسعه (Contributing)
+
+از مشارکت شما در بهبود **سیاهه** (به‌خصوص افزودن الگوهای پیامک بانک‌های جدید، دسته‌بندی پذیرنده‌های ایرانی و بهبود رابط کاربری) استقبال می‌کنیم:
+
+1. مخزن را **Fork** کنید و یک شاخه جدید بسازید (`git checkout -b feat/your-feature`).
+2. در صورت افزودن پارسر یا الگوی پیامک جدید، حتماً تست واحد آن را در پوشه `test/` اضافه کنید.
+3. پیش از ارسال Pull Request مطمئن شوید `flutter analyze` و `flutter test` بدون خطا پاس می‌شوند.
+4. تغییرات خود را با توضیح واضح در قالب **Pull Request** ارسال کنید.
+
+---
+
+## منابع و قدردانی (Credits)
+
+- آیکون و لوگوی بانک‌ها و برندهای ایرانی از مجموعه متن‌باز [**persianlabs/icons**](https://github.com/persianlabs/icons) (تحت لایسنس MIT — متن لایسنس در [LICENSE-persianlabs-icons.txt](assets/icons/banks/LICENSE-persianlabs-icons.txt)) استفاده شده است.
+- طراحی شیشه‌ای رابط کاربری با کتابخانه [`liquid_glass_widgets`](https://pub.dev/packages/liquid_glass_widgets) پیاده‌سازی شده است.
+
+---
+
+## لایسنس (License)
+
+این پروژه تحت لایسنس **MIT** منتشر شده است. برای جزئیات بیشتر فایل [LICENSE](LICENSE) را مطالعه کنید.
