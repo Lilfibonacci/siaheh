@@ -61,6 +61,18 @@
 
 ## معماری و فناوری‌ها
 
+پروژه با **معماری لایه‌ای رسمی Flutter (Layered Architecture)** و جداسازی کامل وابستگی‌ها طراحی شده است:
+
+```text
+lib/
+├── config/          # تزریق وابستگی (get_it) و مسیریابی (go_router)
+├── domain/          # مدل‌های خالص Dart و قراردادهای Repository (بدون وابستگی به Flutter یا Data)
+├── data/            # سرویس‌های محلی (Hive)، سرویس خواندن پیامک اندروید، پارسرها و پیاده‌سازی Repositoryها
+└── ui/
+    ├── core/        # مدیریت وضعیت (Bloc)، تم Liquid Glass، مپرها و ویجت‌های مشترک
+    └── features/    # صفحات و ویجت‌های تفکیک‌شده بر اساس فیچر (splash, dashboard, home, transactions, messages, senders)
+```
+
 - **Flutter & Dart** (`sdk: ^3.13.5`)
 - **مدیریت وضعیت:** `flutter_bloc` (استاندارد `Bloc<Event, State>`) + `equatable`
 - **دیتابیس محلی:** `hive_ce` / `hive_ce_flutter`

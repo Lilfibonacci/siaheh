@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-import 'package:siaheh/core/di/injection_container.dart';
-import 'package:siaheh/core/router/app_global_router.dart';
-import 'package:siaheh/core/theme/app_theme.dart';
-import 'package:siaheh/core/theme/siaheh_glass.dart';
-import 'package:siaheh/presentation/bloc/finance_bloc.dart';
-import 'package:siaheh/presentation/bloc/finance_event.dart';
-import 'package:siaheh/presentation/bloc/theme_bloc.dart';
+import 'package:siaheh/config/di/injection_container.dart';
+import 'package:siaheh/config/router/app_router.dart';
+import 'package:siaheh/ui/core/bloc/finance_bloc.dart';
+import 'package:siaheh/ui/core/bloc/finance_event.dart';
+import 'package:siaheh/ui/core/bloc/theme_bloc.dart';
+import 'package:siaheh/ui/core/theme/app_theme.dart';
+import 'package:siaheh/ui/core/theme/siaheh_glass.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,7 +58,7 @@ class _MyAppState extends State<MyApp> {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeState.mode,
-          routerConfig: appGlobalRouter,
+          routerConfig: appRouter,
           builder: (context, child) =>
               Directionality(textDirection: TextDirection.rtl, child: child!),
         ),
