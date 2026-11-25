@@ -61,16 +61,25 @@
 
 ## معماری و فناوری‌ها
 
-پروژه با **معماری لایه‌ای رسمی Flutter (Layered Architecture)** و جداسازی کامل وابستگی‌ها طراحی شده است:
+پروژه با **معماری پاک (Clean Architecture)** و تفکیک کامل لایه‌ها و مسئولیت‌ها طراحی شده است:
 
 ```text
 lib/
-├── config/          # تزریق وابستگی (get_it) و مسیریابی (go_router)
-├── domain/          # مدل‌های خالص Dart و قراردادهای Repository (بدون وابستگی به Flutter یا Data)
-├── data/            # سرویس‌های محلی (Hive)، سرویس خواندن پیامک اندروید، پارسرها و پیاده‌سازی Repositoryها
-└── ui/
-    ├── core/        # مدیریت وضعیت (Bloc)، تم Liquid Glass، مپرها و ویجت‌های مشترک
-    └── features/    # صفحات و ویجت‌های تفکیک‌شده بر اساس فیچر (splash, dashboard, home, transactions, messages, senders)
+├── core/            # تزریق وابستگی (di)، خطاها (error)، مسیریابی (router)، تم و ابزارهای مشترک
+├── domain/          # Dart خالص بدون وابستگی به فلاتر/دیتا:
+│   ├── entities/    # موجودیت‌های خالص دامنه و فیلتر تاریخ شمسی
+│   ├── repositories/# قراردادها (Interface)ی ریپازیتوری‌ها
+│   └── usecases/    # قرارداد پایه (usecase.dart) و موارد کاربردی (Finance & Theme)
+├── data/            # لایه داده:
+│   ├── datasources/ # اینترفیس و پیاده‌سازی دیتاسورس‌های محلی (Hive) و پلتفرمی (اندروید)
+│   ├── dtos/        # مدل‌های انتقال و ذخیره‌سازی داده (Data Transfer Objects)
+│   ├── mappers/     # تبدیل‌کننده‌های DTO <-> Entity
+│   ├── parsers/     # نرمال‌سازی، تشخیص بانک، پارسرهای پیامک و همبستگی OTP
+│   └── repositories/# پیاده‌سازی ریپازیتوری‌ها
+└── presentation/    # لایه نمایش:
+    ├── bloc/        # مدیریت وضعیت استاندارد BLoC، ViewModelها و مپر UI
+    ├── screens/     # صفحات و تب‌های اصلی اپلیکیشن
+    └── widgets/     # ویجت‌ها و باتم‌شیت‌های شیشه‌ای (Liquid Glass)
 ```
 
 - **Flutter & Dart** (`sdk: ^3.13.5`)

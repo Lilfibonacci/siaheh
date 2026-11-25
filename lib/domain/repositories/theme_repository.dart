@@ -1,5 +1,4 @@
-/// Pure domain representation of the user's persisted theme preference.
-enum AppThemePreference { system, light, dark }
+import 'package:siaheh/domain/entities/app_theme_preference.dart';
 
 /// Contract for persisting and reading the user's theme preference.
 abstract interface class ThemeRepository {

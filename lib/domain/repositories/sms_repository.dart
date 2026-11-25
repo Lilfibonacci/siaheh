@@ -1,34 +1,11 @@
 import 'package:dartz/dartz.dart';
-import 'package:equatable/equatable.dart';
-import 'package:siaheh/domain/models/failure.dart';
-import 'package:siaheh/domain/models/bank_sms_message.dart';
-import 'package:siaheh/domain/models/bank_transaction.dart';
-import 'package:siaheh/domain/models/category_rule.dart';
-import 'package:siaheh/domain/models/custom_category.dart';
-import 'package:siaheh/domain/models/sms_sender.dart';
-
-/// Summary of an inbox sync pass.
-class SyncResult extends Equatable {
-  const SyncResult({
-    this.newMessages = 0,
-    this.newTransactions = 0,
-    this.discoveredSenders = 0,
-    this.linkedTransfers = 0,
-  });
-
-  final int newMessages;
-  final int newTransactions;
-  final int discoveredSenders;
-  final int linkedTransfers;
-
-  @override
-  List<Object?> get props => [
-    newMessages,
-    newTransactions,
-    discoveredSenders,
-    linkedTransfers,
-  ];
-}
+import 'package:siaheh/core/error/failure.dart';
+import 'package:siaheh/domain/entities/bank_sms_message.dart';
+import 'package:siaheh/domain/entities/bank_transaction.dart';
+import 'package:siaheh/domain/entities/category_rule.dart';
+import 'package:siaheh/domain/entities/custom_category.dart';
+import 'package:siaheh/domain/entities/sms_sender.dart';
+import 'package:siaheh/domain/entities/sync_result.dart';
 
 abstract interface class SmsRepository {
   Future<Either<Failure, List<BankTransaction>>> getTransactions();

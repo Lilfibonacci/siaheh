@@ -3,17 +3,24 @@ import 'dart:isolate';
 
 import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
-import 'package:siaheh/domain/models/failure.dart';
-import 'package:siaheh/data/services/platform/sms_inbox_service.dart';
-import 'package:siaheh/data/services/local/sms_local_storage_service.dart';
-import 'package:siaheh/data/services/parsers/expense_categorizer.dart';
-import 'package:siaheh/data/services/parsers/internal_transfer_detector.dart';
-import 'package:siaheh/data/services/parsers/sms_parser_pipeline.dart';
-import 'package:siaheh/domain/models/bank_sms_message.dart';
-import 'package:siaheh/domain/models/bank_transaction.dart';
-import 'package:siaheh/domain/models/category_rule.dart';
-import 'package:siaheh/domain/models/custom_category.dart';
-import 'package:siaheh/domain/models/sms_sender.dart';
+import 'package:siaheh/core/error/failure.dart';
+import 'package:siaheh/data/datasources/sms_inbox_data_source.dart';
+import 'package:siaheh/data/datasources/sms_local_data_source.dart';
+import 'package:siaheh/data/dtos/raw_sms_dto.dart';
+import 'package:siaheh/data/mappers/bank_sms_message_mapper.dart';
+import 'package:siaheh/data/mappers/bank_transaction_mapper.dart';
+import 'package:siaheh/data/mappers/category_rule_mapper.dart';
+import 'package:siaheh/data/mappers/custom_category_mapper.dart';
+import 'package:siaheh/data/mappers/sms_sender_mapper.dart';
+import 'package:siaheh/data/parsers/expense_categorizer.dart';
+import 'package:siaheh/data/parsers/internal_transfer_detector.dart';
+import 'package:siaheh/data/parsers/sms_parser_pipeline.dart';
+import 'package:siaheh/domain/entities/bank_sms_message.dart';
+import 'package:siaheh/domain/entities/bank_transaction.dart';
+import 'package:siaheh/domain/entities/category_rule.dart';
+import 'package:siaheh/domain/entities/custom_category.dart';
+import 'package:siaheh/domain/entities/sms_sender.dart';
+import 'package:siaheh/domain/entities/sync_result.dart';
 import 'package:siaheh/domain/repositories/sms_repository.dart';
 
 class SmsRepositoryImpl implements SmsRepository {
@@ -38,8 +45,8 @@ class SmsRepositoryImpl implements SmsRepository {
   static const int _pageSize = 500;
   static const int _maxPages = 120; // Up to 60,000 SMS
 
-  final SmsLocalStorageService _local;
-  final SmsInboxService _inbox;
+  final SmsLocalDataSource _local;
+  final SmsInboxDataSource _inbox;
   final SmsParserPipeline _pipeline;
   final InternalTransferDetector _transferDetector;
   final ExpenseCategorizer _categorizer;
@@ -73,7 +80,10 @@ class SmsRepositoryImpl implements SmsRepository {
       _listening = true;
       _inbox.listen((sms) async {
         try {
-          final senders = _local.senders();
+          final senders = _local
+              .senders()
+              .map(SmsSenderMapper.toEntity)
+              .toList();
           final result = await _processSingleSms(sms, senders);
           if (result.message != null) {
             if (result.transaction != null) {
@@ -96,7 +106,7 @@ class SmsRepositoryImpl implements SmsRepository {
   }
 
   Future<_SingleSmsResult> _processSingleSms(
-    RawSms sms,
+    RawSmsDto sms,
     List<SmsSender> senders,
   ) async {
     final outcome = _pipeline.process(
@@ -121,7 +131,7 @@ class SmsRepositoryImpl implements SmsRepository {
       // Upgrade an 'unknown' sender if we now identified its real bankKey.
       if (sender.bankKey == 'unknown' && outcome.bankKey != 'unknown') {
         sender = sender.copyWith(bankKey: outcome.bankKey);
-        await _local.putSender(sender);
+        await _local.putSender(SmsSenderMapper.toDto(sender));
         final idx = senders.indexWhere((s) => s.number == sender.number);
         if (idx >= 0) senders[idx] = sender;
       }
@@ -133,7 +143,7 @@ class SmsRepositoryImpl implements SmsRepository {
         enabled: true,
         autoDetected: true,
       );
-      await _local.putSender(sender);
+      await _local.putSender(SmsSenderMapper.toDto(sender));
       senders.add(sender);
       discoveredNewSender = true;
     }
@@ -159,7 +169,7 @@ class SmsRepositoryImpl implements SmsRepository {
         title: parsed.suggestedTitle,
         needsReview: parsed.needsReview,
       );
-      await _local.putTransaction(createdTx);
+      await _local.putTransaction(BankTransactionMapper.toDto(createdTx));
     }
 
     BankSmsMessage? createdMessage;
@@ -174,7 +184,7 @@ class SmsRepositoryImpl implements SmsRepository {
         transactionId:
             outcome.kind == BankSmsKind.transaction ? id : null,
       );
-      await _local.putBankMessage(createdMessage);
+      await _local.putBankMessage(BankSmsMessageMapper.toDto(createdMessage));
     }
 
     return _SingleSmsResult(
@@ -185,25 +195,37 @@ class SmsRepositoryImpl implements SmsRepository {
   }
 
   Future<int> _linkInternalTransfers() async {
-    final all = _local.transactions();
+    final all = _local
+        .transactions()
+        .map(BankTransactionMapper.toEntity)
+        .toList();
     final changes = _transferDetector.detectChanges(all);
     if (changes.isNotEmpty) {
-      await _local.putTransactions(changes);
+      await _local.putTransactions(changes.map(BankTransactionMapper.toDto));
     }
     return changes.length ~/ 2;
   }
 
   Future<int> _categorizeUneditedTransactions() async {
-    final allTx = _local.transactions();
-    final allMsgs = _local.bankMessages();
-    final rules = _local.categoryRules();
+    final allTx = _local
+        .transactions()
+        .map(BankTransactionMapper.toEntity)
+        .toList();
+    final allMsgs = _local
+        .bankMessages()
+        .map(BankSmsMessageMapper.toEntity)
+        .toList();
+    final rules = _local
+        .categoryRules()
+        .map(CategoryRuleMapper.toEntity)
+        .toList();
     final changes = _categorizer.categorizeAll(
       transactions: allTx,
       bankMessages: allMsgs,
       userRules: rules,
     );
     if (changes.isNotEmpty) {
-      await _local.putTransactions(changes);
+      await _local.putTransactions(changes.map(BankTransactionMapper.toDto));
     }
     return changes.length;
   }
@@ -245,7 +267,10 @@ class SmsRepositoryImpl implements SmsRepository {
 
       final lastSync = effectiveFullRescan ? null : _local.lastSyncedAt();
       final since = lastSync?.subtract(_syncOverlap);
-      final senders = _local.senders();
+      final senders = _local
+          .senders()
+          .map(SmsSenderMapper.toEntity)
+          .toList();
 
       var newMessages = 0;
       var newTransactions = 0;
@@ -358,13 +383,19 @@ class SmsRepositoryImpl implements SmsRepository {
           }
 
           if (pendingSenders.isNotEmpty) {
-            await _local.putSenders(pendingSenders.values);
+            await _local.putSenders(
+              pendingSenders.values.map(SmsSenderMapper.toDto),
+            );
           }
           if (pendingTransactions.isNotEmpty) {
-            await _local.putTransactions(pendingTransactions.values);
+            await _local.putTransactions(
+              pendingTransactions.values.map(BankTransactionMapper.toDto),
+            );
           }
           if (pendingMessages.isNotEmpty) {
-            await _local.putBankMessages(pendingMessages.values);
+            await _local.putBankMessages(
+              pendingMessages.values.map(BankSmsMessageMapper.toDto),
+            );
           }
         }
 
@@ -432,7 +463,12 @@ class SmsRepositoryImpl implements SmsRepository {
 
   @override
   Future<Either<Failure, List<BankTransaction>>> getTransactions() =>
-      _guard(() async => _local.transactions());
+      _guard(
+        () async => _local
+            .transactions()
+            .map(BankTransactionMapper.toEntity)
+            .toList(),
+      );
 
   @override
   Future<Either<Failure, Unit>> updateTransaction(
@@ -440,7 +476,7 @@ class SmsRepositoryImpl implements SmsRepository {
     bool applyToSimilar = false,
   }) => _guard(() async {
     final edited = tx.copyWith(userEdited: true);
-    await _local.putTransaction(edited);
+    await _local.putTransaction(BankTransactionMapper.toDto(edited));
 
     if (applyToSimilar && edited.categoryId != null) {
       final candidatePattern = _extractLearningPattern(edited);
@@ -453,15 +489,21 @@ class SmsRepositoryImpl implements SmsRepository {
               ? edited.title
               : null,
         );
-        await _local.putCategoryRule(rule);
+        await _local.putCategoryRule(CategoryRuleMapper.toDto(rule));
 
+        final existing = _local
+            .transactions()
+            .map(BankTransactionMapper.toEntity)
+            .toList();
         final similarChanges = _categorizer.applyRuleToExisting(
-          transactions: _local.transactions(),
+          transactions: existing,
           rule: rule,
           excludeTransactionId: edited.id,
         );
         if (similarChanges.isNotEmpty) {
-          await _local.putTransactions(similarChanges);
+          await _local.putTransactions(
+            similarChanges.map(BankTransactionMapper.toDto),
+          );
         }
       }
     }
@@ -491,11 +533,18 @@ class SmsRepositoryImpl implements SmsRepository {
 
   @override
   Future<Either<Failure, List<BankSmsMessage>>> getBankMessages() =>
-      _guard(() async => _local.bankMessages());
+      _guard(
+        () async => _local
+            .bankMessages()
+            .map(BankSmsMessageMapper.toEntity)
+            .toList(),
+      );
 
   @override
   Future<Either<Failure, List<SmsSender>>> getSenders() =>
-      _guard(() async => _local.senders());
+      _guard(
+        () async => _local.senders().map(SmsSenderMapper.toEntity).toList(),
+      );
 
   @override
   Future<Either<Failure, Unit>> saveSender(SmsSender sender) =>
@@ -506,7 +555,7 @@ class SmsRepositoryImpl implements SmsRepository {
           enabled: sender.enabled,
           autoDetected: sender.autoDetected,
         );
-        await _local.putSender(canonical);
+        await _local.putSender(SmsSenderMapper.toDto(canonical));
         return unit;
       });
 
@@ -514,24 +563,32 @@ class SmsRepositoryImpl implements SmsRepository {
   Future<Either<Failure, Unit>> deleteSender(String number) =>
       _guard(() async {
         final canonical = SmsSender.canonicalAddress(number);
-        final target = _local.senders().where(
+        final targetDto = _local.senders().where(
           (s) => s.number == number || s.number == canonical,
         ).firstOrNull;
-        await _local.deleteSender(target?.number ?? number);
-        if (target != null) {
-          await _local.deleteMessagesAndAutoTransactionsForSender(target);
+        await _local.deleteSender(targetDto?.number ?? number);
+        if (targetDto != null) {
+          final target = SmsSenderMapper.toEntity(targetDto);
+          await _local.deleteMessagesAndAutoTransactionsMatching(
+            target.matchesAddress,
+          );
         }
         return unit;
       });
 
   @override
   Future<Either<Failure, List<CustomCategory>>> getCustomCategories() =>
-      _guard(() async => _local.customCategories());
+      _guard(
+        () async => _local
+            .customCategories()
+            .map(CustomCategoryMapper.toEntity)
+            .toList(),
+      );
 
   @override
   Future<Either<Failure, Unit>> saveCustomCategory(CustomCategory category) =>
       _guard(() async {
-        await _local.putCustomCategory(category);
+        await _local.putCustomCategory(CustomCategoryMapper.toDto(category));
         return unit;
       });
 
@@ -544,7 +601,12 @@ class SmsRepositoryImpl implements SmsRepository {
 
   @override
   Future<Either<Failure, List<CategoryRule>>> getCategoryRules() =>
-      _guard(() async => _local.categoryRules());
+      _guard(
+        () async => _local
+            .categoryRules()
+            .map(CategoryRuleMapper.toEntity)
+            .toList(),
+      );
 
   @override
   Future<bool> hasSmsPermission() => _inbox.hasPermission();
@@ -576,7 +638,7 @@ class SmsRepositoryImpl implements SmsRepository {
 /// Top-level batch worker executed via [Isolate.run] to keep regex parsing off
 /// the Dart UI thread.
 List<_ParsedBatchItem> _parseBatchInIsolate(
-  List<RawSms> messages,
+  List<RawSmsDto> messages,
   List<SmsSender> knownSenders,
 ) {
   final pipeline = SmsParserPipeline();
@@ -624,7 +686,7 @@ class _ParsedBatchItem {
     required this.canonicalAddress,
   });
 
-  final RawSms sms;
+  final RawSmsDto sms;
   final SmsParseOutcome outcome;
   final String canonicalAddress;
 }
