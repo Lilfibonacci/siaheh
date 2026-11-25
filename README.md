@@ -7,6 +7,9 @@
   <p>
     <em>طراحی مدرن Liquid Glass • پشتیبانی کامل از تقویم شمسی • بدون نیاز به اینترنت و سرور</em>
   </p>
+  <p>
+    <strong>فارسی</strong> | <a href="README.en.md">English</a>
+  </p>
 </div>
 
 ---
