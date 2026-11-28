@@ -104,8 +104,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     categoryFilter: _selectedCategoryFilter,
                     externalDateFilter: _selectedDateFilter,
                     externalDateFilterVersion: _dateFilterVersion,
-                    onClearCategoryFilter: () =>
-                        setState(() => _selectedCategoryFilter = null),
+                    onCategoryFilterChanged: (category) =>
+                        setState(() => _selectedCategoryFilter = category),
                   )
                 : const SizedBox.shrink(),
             _mountedTabs.contains(2)

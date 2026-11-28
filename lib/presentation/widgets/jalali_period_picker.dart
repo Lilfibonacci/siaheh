@@ -34,13 +34,13 @@ Future<JalaliDateFilter?> showJalaliPeriodPickerSheet({
     dragIndicatorColor: capturedTheme.colorScheme.onSurface.withValues(
       alpha: 0.28,
     ),
-    builder: (_) => Theme(
+    builder: (sheetContext) => Theme(
       data: capturedTheme,
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Material(
           type: MaterialType.transparency,
-          child: _JalaliPeriodPickerContent(
+          child: JalaliPeriodPickerContent(
             title: title,
             initialFilter: initialFilter,
             countsByYearMonth: countsByYearMonth,
@@ -48,6 +48,7 @@ Future<JalaliDateFilter?> showJalaliPeriodPickerSheet({
             allowWholeYear: allowWholeYear,
             allowQuickRanges: allowQuickRanges,
             itemUnitLabel: itemUnitLabel,
+            onSelected: (filter) => Navigator.of(sheetContext).pop(filter),
           ),
         ),
       ),
@@ -55,32 +56,39 @@ Future<JalaliDateFilter?> showJalaliPeriodPickerSheet({
   );
 }
 
-class _JalaliPeriodPickerContent extends StatefulWidget {
-  const _JalaliPeriodPickerContent({
+/// Reusable Liquid Glass Jalali (Shamsi) year & month picker view used both as
+/// a standalone [GlassSheet] (e.g. from the Home donut chart) and as an
+/// inline sub-view inside the unified filter sheets.
+class JalaliPeriodPickerContent extends StatefulWidget {
+  const JalaliPeriodPickerContent({
+    super.key,
     required this.title,
     required this.initialFilter,
     required this.countsByYearMonth,
-    required this.allowAll,
-    required this.allowWholeYear,
-    required this.allowQuickRanges,
-    required this.itemUnitLabel,
+    required this.onSelected,
+    this.onBack,
+    this.allowAll = true,
+    this.allowWholeYear = true,
+    this.allowQuickRanges = true,
+    this.itemUnitLabel = 'مورد',
   });
 
   final String title;
   final JalaliDateFilter initialFilter;
   final Map<int, Map<int, int>> countsByYearMonth;
+  final ValueChanged<JalaliDateFilter> onSelected;
+  final VoidCallback? onBack;
   final bool allowAll;
   final bool allowWholeYear;
   final bool allowQuickRanges;
   final String itemUnitLabel;
 
   @override
-  State<_JalaliPeriodPickerContent> createState() =>
+  State<JalaliPeriodPickerContent> createState() =>
       _JalaliPeriodPickerContentState();
 }
 
-class _JalaliPeriodPickerContentState
-    extends State<_JalaliPeriodPickerContent> {
+class _JalaliPeriodPickerContentState extends State<JalaliPeriodPickerContent> {
   late final Jalali _nowJalali = Jalali.fromDateTime(DateTime.now());
   late int _selectedYear;
 
@@ -110,10 +118,6 @@ class _JalaliPeriodPickerContentState
     return sum;
   }
 
-  void _select(JalaliDateFilter filter) {
-    Navigator.of(context).pop(filter);
-  }
-
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
@@ -136,12 +140,30 @@ class _JalaliPeriodPickerContentState
         children: [
           Row(
             children: [
-              Icon(
-                Icons.calendar_month_rounded,
-                color: scheme.primary,
-                size: 22,
-              ),
-              const SizedBox(width: 8),
+              if (widget.onBack != null) ...[
+                GlassButton.custom(
+                  useOwnLayer: true,
+                  quality: GlassQuality.standard,
+                  width: 38,
+                  height: 38,
+                  stretch: 0.15,
+                  label: 'بازگشت',
+                  onTap: widget.onBack!,
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 19,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ] else ...[
+                Icon(
+                  Icons.calendar_month_rounded,
+                  color: scheme.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: Text(
                   widget.title,
@@ -151,65 +173,63 @@ class _JalaliPeriodPickerContentState
                 ),
               ),
               if (widget.allowAll && widget.initialFilter.isActive)
-                TextButton(
-                  onPressed: () => _select(const JalaliDateFilter.all()),
-                  child: const Text('حذف فیلتر'),
+                SiahehGlassChip(
+                  label: 'حذف فیلتر',
+                  selected: false,
+                  onTap: () => widget.onSelected(const JalaliDateFilter.all()),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Quick presets
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (widget.allowAll)
-                _QuickPill(
-                  label: 'همه زمان‌ها',
-                  selected: !widget.initialFilter.isActive,
-                  onTap: () => _select(const JalaliDateFilter.all()),
-                ),
-              if (widget.allowQuickRanges) ...[
-                _QuickPill(
-                  label: 'امروز',
-                  selected:
-                      widget.initialFilter.kind == JalaliFilterKind.today,
-                  onTap: () => _select(const JalaliDateFilter.today()),
-                ),
-                _QuickPill(
-                  label: '۷ روز اخیر',
-                  selected:
-                      widget.initialFilter.kind == JalaliFilterKind.last7Days,
-                  onTap: () => _select(const JalaliDateFilter.last7Days()),
-                ),
-              ],
-              _QuickPill(
-                label: 'این ماه',
-                selected: widget.initialFilter == thisMonth,
-                onTap: () => _select(thisMonth),
-              ),
-              _QuickPill(
-                label: 'ماه قبل',
-                selected: widget.initialFilter == lastMonth,
-                onTap: () => _select(lastMonth),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          // Year selector bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.black.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.10)
-                    : scheme.outline.withValues(alpha: 0.8),
+          if (widget.allowAll || widget.allowQuickRanges) ...[
+            const SizedBox(height: 12),
+            GlassBackdropGroup(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (widget.allowAll)
+                    SiahehGlassChip(
+                      label: 'همه زمان‌ها',
+                      selected: !widget.initialFilter.isActive,
+                      onTap: () =>
+                          widget.onSelected(const JalaliDateFilter.all()),
+                    ),
+                  if (widget.allowQuickRanges) ...[
+                    SiahehGlassChip(
+                      label: 'امروز',
+                      selected:
+                          widget.initialFilter.kind == JalaliFilterKind.today,
+                      onTap: () =>
+                          widget.onSelected(const JalaliDateFilter.today()),
+                    ),
+                    SiahehGlassChip(
+                      label: '۷ روز اخیر',
+                      selected:
+                          widget.initialFilter.kind ==
+                          JalaliFilterKind.last7Days,
+                      onTap: () =>
+                          widget.onSelected(const JalaliDateFilter.last7Days()),
+                    ),
+                  ],
+                  SiahehGlassChip(
+                    label: 'این ماه',
+                    selected: widget.initialFilter == thisMonth,
+                    onTap: () => widget.onSelected(thisMonth),
+                  ),
+                  SiahehGlassChip(
+                    label: 'ماه قبل',
+                    selected: widget.initialFilter == lastMonth,
+                    onTap: () => widget.onSelected(lastMonth),
+                  ),
+                ],
               ),
             ),
+          ],
+          const SizedBox(height: 16),
+          // Year selector bar
+          SiahehGlassCard(
+            radius: 18,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             child: Row(
               children: [
                 IconButton(
@@ -244,79 +264,75 @@ class _JalaliPeriodPickerContentState
           if (_suggestedYears.length > 1) ...[
             const SizedBox(height: 10),
             SizedBox(
-              height: 34,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _suggestedYears.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final int y = _suggestedYears[i];
-                  final bool selected = y == _selectedYear;
-                  return _QuickPill(
-                    label: PersianFormat.digits('$y'),
-                    selected: selected,
-                    onTap: () => setState(() => _selectedYear = y),
-                  );
-                },
+              height: 36,
+              child: GlassBackdropGroup(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _suggestedYears.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final int y = _suggestedYears[i];
+                    return Center(
+                      child: SiahehGlassChip(
+                        label: PersianFormat.digits('$y'),
+                        selected: y == _selectedYear,
+                        onTap: () => setState(() => _selectedYear = y),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
           if (widget.allowWholeYear) ...[
             const SizedBox(height: 10),
-            InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () => _select(JalaliDateFilter.year(_selectedYear)),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isWholeYearSelected
-                      ? scheme.primary.withValues(alpha: isDark ? 0.24 : 0.16)
-                      : (isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.white.withValues(alpha: 0.65)),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isWholeYearSelected
-                        ? scheme.primary
-                        : (isDark
-                            ? Colors.white.withValues(alpha: 0.10)
-                            : scheme.outline),
+            SiahehGlassCard(
+              radius: 16,
+              tintColor: isWholeYearSelected ? scheme.primary : null,
+              borderColor: isWholeYearSelected
+                  ? scheme.primary.withValues(alpha: 0.78)
+                  : null,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () =>
+                    widget.onSelected(JalaliDateFilter.year(_selectedYear)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.date_range_rounded,
-                      size: 18,
-                      color: isWholeYearSelected
-                          ? scheme.primary
-                          : scheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        PersianFormat.digits('کل سال $_selectedYear'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: isWholeYearSelected
-                              ? scheme.primary
-                              : scheme.onSurface,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.date_range_rounded,
+                        size: 18,
+                        color: isWholeYearSelected
+                            ? scheme.primary
+                            : scheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          PersianFormat.digits('کل سال $_selectedYear'),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isWholeYearSelected
+                                ? (isDark ? scheme.primary : scheme.onSurface)
+                                : scheme.onSurface,
+                          ),
                         ),
                       ),
-                    ),
-                    if (selectedYearTotal > 0)
-                      Text(
-                        PersianFormat.digits(
-                          '$selectedYearTotal ${widget.itemUnitLabel}',
+                      if (selectedYearTotal > 0)
+                        Text(
+                          PersianFormat.digits(
+                            '$selectedYearTotal ${widget.itemUnitLabel}',
+                          ),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurface.withValues(alpha: 0.6),
+                          ),
                         ),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -331,7 +347,7 @@ class _JalaliPeriodPickerContentState
               crossAxisCount: 3,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
-              mainAxisExtent: 58,
+              mainAxisExtent: 60,
             ),
             itemBuilder: (_, index) {
               final int month = index + 1;
@@ -345,131 +361,72 @@ class _JalaliPeriodPickerContentState
                   widget.initialFilter.month == month;
               final int count = monthCounts[month] ?? 0;
 
-              return InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: isFuture
-                    ? null
-                    : () => _select(
-                        JalaliDateFilter.month(
-                          year: _selectedYear,
-                          month: month,
-                        ),
-                      ),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? scheme.primary.withValues(alpha: isDark ? 0.25 : 0.16)
-                        : (isDark
-                            ? Colors.white.withValues(
-                                alpha: isFuture ? 0.02 : 0.06,
-                              )
-                            : Colors.white.withValues(
-                                alpha: isFuture ? 0.32 : 0.72,
-                              )),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: isSelected
-                          ? scheme.primary
-                          : (count > 0 && !isFuture
-                              ? scheme.primary.withValues(alpha: 0.28)
-                              : (isDark
-                                  ? Colors.white.withValues(alpha: 0.09)
-                                  : scheme.outline.withValues(alpha: 0.7))),
-                      width: isSelected ? 1.4 : 1.0,
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        JalaliDateFilter.persianMonthNames[index],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.w600,
-                          color: isFuture
-                              ? scheme.onSurface.withValues(alpha: 0.28)
-                              : (isSelected
-                                  ? scheme.primary
-                                  : scheme.onSurface),
-                        ),
-                      ),
-                      if (count > 0 && !isFuture) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          PersianFormat.digits('$count ${widget.itemUnitLabel}'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            fontSize: 10,
-                            color: isSelected
-                                ? scheme.primary.withValues(alpha: 0.9)
-                                : scheme.onSurface.withValues(alpha: 0.52),
+              return Opacity(
+                opacity: isFuture ? 0.38 : 1.0,
+                child: SiahehGlassCard(
+                  radius: 16,
+                  tintColor: isSelected ? scheme.primary : null,
+                  borderColor: isSelected
+                      ? scheme.primary.withValues(alpha: 0.80)
+                      : (count > 0 && !isFuture
+                          ? scheme.primary.withValues(alpha: 0.28)
+                          : null),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: isFuture
+                        ? null
+                        : () => widget.onSelected(
+                            JalaliDateFilter.month(
+                              year: _selectedYear,
+                              month: month,
+                            ),
                           ),
-                        ),
-                      ],
-                    ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 6,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            JalaliDateFilter.persianMonthNames[index],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              color: isSelected
+                                  ? (isDark ? scheme.primary : scheme.onSurface)
+                                  : scheme.onSurface,
+                            ),
+                          ),
+                          if (count > 0 && !isFuture) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              PersianFormat.digits(
+                                '$count ${widget.itemUnitLabel}',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontSize: 10,
+                                color: isSelected
+                                    ? scheme.primary.withValues(alpha: 0.9)
+                                    : scheme.onSurface.withValues(alpha: 0.52),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               );
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _QuickPill extends StatelessWidget {
-  const _QuickPill({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
-    final bool isDark = theme.brightness == Brightness.dark;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? scheme.primary.withValues(alpha: isDark ? 0.25 : 0.16)
-              : (isDark
-                  ? Colors.white.withValues(alpha: 0.06)
-                  : Colors.white.withValues(alpha: 0.72)),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected
-                ? scheme.primary
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : scheme.outline),
-          ),
-        ),
-        child: Text(
-          label,
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-            color: selected ? scheme.primary : scheme.onSurface,
-          ),
-        ),
       ),
     );
   }

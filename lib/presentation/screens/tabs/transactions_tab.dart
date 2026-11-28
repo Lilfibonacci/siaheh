@@ -10,11 +10,10 @@ import 'package:siaheh/presentation/bloc/finance/finance_event.dart';
 import 'package:siaheh/presentation/bloc/finance/finance_mapper.dart';
 import 'package:siaheh/presentation/bloc/finance/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
+import 'package:siaheh/presentation/widgets/filter_sheets.dart';
 import 'package:siaheh/presentation/widgets/jalali_period_picker.dart';
 import 'package:siaheh/presentation/widgets/transaction_edit_sheet.dart';
 import 'package:siaheh/presentation/widgets/transaction_tile.dart';
-
-enum _Filter { all, income, expense, transfer, review }
 
 class TransactionsTab extends StatefulWidget {
   const TransactionsTab({
@@ -22,34 +21,27 @@ class TransactionsTab extends StatefulWidget {
     this.categoryFilter,
     this.externalDateFilter,
     this.externalDateFilterVersion = 0,
-    this.onClearCategoryFilter,
+    this.onCategoryFilterChanged,
   });
 
   final String? categoryFilter;
   final JalaliDateFilter? externalDateFilter;
   final int externalDateFilterVersion;
-  final VoidCallback? onClearCategoryFilter;
+  final ValueChanged<String?>? onCategoryFilterChanged;
 
   @override
   State<TransactionsTab> createState() => _TransactionsTabState();
 }
 
 class _TransactionsTabState extends State<TransactionsTab> {
-  late _Filter _filter =
-      widget.categoryFilter != null ? _Filter.expense : _Filter.all;
+  late TransactionTypeFilter _filter = widget.categoryFilter != null
+      ? TransactionTypeFilter.expense
+      : TransactionTypeFilter.all;
   late JalaliDateFilter _dateFilter =
       widget.externalDateFilter ?? const JalaliDateFilter.all();
   String? _bankFilter;
   bool _searching = false;
   final TextEditingController _search = TextEditingController();
-
-  static const Map<_Filter, String> _labels = {
-    _Filter.all: 'همه',
-    _Filter.income: 'واریز',
-    _Filter.expense: 'برداشت',
-    _Filter.transfer: 'انتقال',
-    _Filter.review: 'نیازمند بررسی',
-  };
 
   @override
   void didUpdateWidget(covariant TransactionsTab oldWidget) {
@@ -57,7 +49,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
     if (widget.categoryFilter != null &&
         widget.categoryFilter != oldWidget.categoryFilter) {
       // When drilling down from the expense chart, show expenses for that category.
-      _filter = _Filter.expense;
+      _filter = TransactionTypeFilter.expense;
     }
     if (widget.externalDateFilterVersion !=
             oldWidget.externalDateFilterVersion &&
@@ -70,6 +62,33 @@ class _TransactionsTabState extends State<TransactionsTab> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  Future<void> _openFilterSheet(FinanceMapper mapper) async {
+    final int reviewCount =
+        mapper.activeTransactions.where((t) => t.needsReview).length;
+    final TransactionFilterSelection? picked = await showTransactionFilterSheet(
+      context: context,
+      initial: TransactionFilterSelection(
+        type: _filter,
+        bankKey: _bankFilter,
+        categoryName: widget.categoryFilter,
+        dateFilter: _dateFilter,
+      ),
+      banks: mapper.detectedBanks,
+      categories: mapper.allCategories,
+      countsByYearMonth: mapper.transactionCountsByYearMonth,
+      reviewCount: reviewCount,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _filter = picked.type;
+      _bankFilter = picked.bankKey;
+      _dateFilter = picked.dateFilter;
+    });
+    if (picked.categoryName != widget.categoryFilter) {
+      widget.onCategoryFilterChanged?.call(picked.categoryName);
+    }
   }
 
   Future<void> _openDateFilterPicker(FinanceMapper mapper) async {
@@ -86,6 +105,15 @@ class _TransactionsTabState extends State<TransactionsTab> {
     if (picked != null && mounted) {
       setState(() => _dateFilter = picked);
     }
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _filter = TransactionTypeFilter.all;
+      _bankFilter = null;
+      _dateFilter = const JalaliDateFilter.all();
+    });
+    widget.onCategoryFilterChanged?.call(null);
   }
 
   List<BankTransaction> _filtered(FinanceMapper mapper) {
@@ -106,11 +134,11 @@ class _TransactionsTabState extends State<TransactionsTab> {
         if (catName != activeCategory) return false;
       }
       final matchesType = switch (_filter) {
-        _Filter.all => true,
-        _Filter.income => t.type == TransactionType.income,
-        _Filter.expense => t.type == TransactionType.expense,
-        _Filter.transfer => t.type == TransactionType.transfer,
-        _Filter.review => t.needsReview,
+        TransactionTypeFilter.all => true,
+        TransactionTypeFilter.income => t.type == TransactionType.income,
+        TransactionTypeFilter.expense => t.type == TransactionType.expense,
+        TransactionTypeFilter.transfer => t.type == TransactionType.transfer,
+        TransactionTypeFilter.review => t.needsReview,
       };
       if (!matchesType) return false;
       if (query.isNotEmpty) {
@@ -137,13 +165,16 @@ class _TransactionsTabState extends State<TransactionsTab> {
     final FinanceMapper mapper = FinanceMapper.of(
       context.watch<FinanceBloc>().state,
     );
-    final List<UiBank> banks = mapper.detectedBanks;
     final List<BankTransaction> items = _filtered(mapper);
     final UiCategory? activeCategoryUi = widget.categoryFilter == null
         ? null
         : mapper.categoryOf(widget.categoryFilter);
-    final bool hasSummaryFilter =
-        _dateFilter.isActive || activeCategoryUi != null || _bankFilter != null;
+    final int activeFilterCount =
+        (_filter != TransactionTypeFilter.all ? 1 : 0) +
+        (_bankFilter != null ? 1 : 0) +
+        (activeCategoryUi != null ? 1 : 0) +
+        (_dateFilter.isActive ? 1 : 0);
+    final bool hasSummaryFilter = activeFilterCount > 0;
 
     var filteredExpenseRial = 0;
     var filteredIncomeRial = 0;
@@ -178,24 +209,9 @@ class _TransactionsTabState extends State<TransactionsTab> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      GlassButton.custom(
-                        useOwnLayer: true,
-                        quality: GlassQuality.standard,
-                        width: 44,
-                        height: 44,
-                        stretch: 0.15,
-                        tintColor: _dateFilter.isActive
-                            ? scheme.primary.withValues(alpha: 0.20)
-                            : null,
-                        label: 'فیلتر زمانی',
-                        onTap: () => _openDateFilterPicker(mapper),
-                        child: Icon(
-                          Icons.calendar_month_rounded,
-                          size: 20,
-                          color: _dateFilter.isActive
-                              ? scheme.primary
-                              : scheme.onSurface,
-                        ),
+                      FilterActionButton(
+                        activeCount: activeFilterCount,
+                        onTap: () => _openFilterSheet(mapper),
                       ),
                       const SizedBox(width: 8),
                       GlassButton.custom(
@@ -225,24 +241,6 @@ class _TransactionsTabState extends State<TransactionsTab> {
               ],
             ),
           ),
-          if (activeCategoryUi != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: SiahehGlassChip(
-                selected: true,
-                accentColor: activeCategoryUi.color,
-                icon: Icon(
-                  activeCategoryUi.icon,
-                  size: 16,
-                  color: activeCategoryUi.color,
-                ),
-                label: 'دسته: ${activeCategoryUi.name}',
-                onDeleted: () {
-                  setState(() => _filter = _Filter.all);
-                  widget.onClearCategoryFilter?.call();
-                },
-              ),
-            ),
           if (_searching)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -264,7 +262,7 @@ class _TransactionsTabState extends State<TransactionsTab> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
-          if (banks.length > 1) ...[
+          if (activeFilterCount > 0) ...[
             const SizedBox(height: 12),
             SizedBox(
               height: 38,
@@ -273,26 +271,85 @@ class _TransactionsTabState extends State<TransactionsTab> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: _GlassFilterChip(
-                          label: 'همه بانک‌ها',
-                          selected: _bankFilter == null,
-                          onTap: () => setState(() => _bankFilter = null),
-                        ),
-                      ),
-                    ),
-                    for (final UiBank b in banks)
+                    if (activeCategoryUi != null)
                       Center(
                         child: Padding(
                           padding: const EdgeInsets.only(left: 8),
-                          child: _GlassFilterChip(
-                            leading: BankLogo(bankKey: b.key, size: 18),
-                            label: b.name,
-                            selected: _bankFilter == b.key,
-                            onTap: () => setState(() => _bankFilter = b.key),
+                          child: SiahehGlassChip(
+                            selected: true,
+                            accentColor: activeCategoryUi.color,
+                            icon: Icon(
+                              activeCategoryUi.icon,
+                              size: 16,
+                              color: activeCategoryUi.color,
+                            ),
+                            label: activeCategoryUi.name,
+                            onTap: () => _openFilterSheet(mapper),
+                            onDeleted: () {
+                              widget.onCategoryFilterChanged?.call(null);
+                              if (_filter == TransactionTypeFilter.expense &&
+                                  _bankFilter == null &&
+                                  !_dateFilter.isActive) {
+                                setState(
+                                  () => _filter = TransactionTypeFilter.all,
+                                );
+                              }
+                            },
                           ),
+                        ),
+                      ),
+                    if (_filter != TransactionTypeFilter.all)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: SiahehGlassChip(
+                            selected: true,
+                            label: _filter.label,
+                            onTap: () => _openFilterSheet(mapper),
+                            onDeleted: () => setState(
+                              () => _filter = TransactionTypeFilter.all,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (_bankFilter != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: SiahehGlassChip(
+                            selected: true,
+                            icon: BankLogo(bankKey: _bankFilter!, size: 18),
+                            label: FinanceMapper.bank(_bankFilter!).name,
+                            onTap: () => _openFilterSheet(mapper),
+                            onDeleted: () =>
+                                setState(() => _bankFilter = null),
+                          ),
+                        ),
+                      ),
+                    if (_dateFilter.isActive)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: JalaliDateFilterChip(
+                            filter: _dateFilter,
+                            onTap: () => _openDateFilterPicker(mapper),
+                            onClear: () => setState(
+                              () => _dateFilter = const JalaliDateFilter.all(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (activeFilterCount >= 2)
+                      Center(
+                        child: SiahehGlassChip(
+                          selected: false,
+                          icon: Icon(
+                            Icons.clear_all_rounded,
+                            size: 16,
+                            color: scheme.onSurface.withValues(alpha: 0.78),
+                          ),
+                          label: 'پاک کردن همه',
+                          onTap: _clearAllFilters,
                         ),
                       ),
                   ],
@@ -300,41 +357,6 @@ class _TransactionsTabState extends State<TransactionsTab> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 38,
-            child: GlassBackdropGroup(
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  if (_dateFilter.isActive) ...[
-                    Center(
-                      child: JalaliDateFilterChip(
-                        filter: _dateFilter,
-                        onTap: () => _openDateFilterPicker(mapper),
-                        onClear: () => setState(
-                          () => _dateFilter = const JalaliDateFilter.all(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  for (final _Filter f in _Filter.values)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: _GlassFilterChip(
-                          label: _labels[f]!,
-                          selected: _filter == f,
-                          onTap: () => setState(() => _filter = f),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 12),
           if (hasSummaryFilter && items.isNotEmpty)
             Padding(
@@ -462,30 +484,6 @@ class _TransactionsTabState extends State<TransactionsTab> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _GlassFilterChip extends StatelessWidget {
-  const _GlassFilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.leading,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Widget? leading;
-
-  @override
-  Widget build(BuildContext context) {
-    return SiahehGlassChip(
-      icon: leading,
-      label: label,
-      selected: selected,
-      onTap: onTap,
     );
   }
 }

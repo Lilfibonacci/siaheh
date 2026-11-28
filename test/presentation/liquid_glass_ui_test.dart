@@ -209,11 +209,30 @@ void main() {
     Navigator.of(tester.element(find.text('افزودن سرشماره بانک'))).pop();
     await tester.pumpAndSettle();
 
-    // Switch to Bank Messages tab and test Jalali date filter sheet & GlassSearchBar.
+    // Switch to Bank Messages tab: no permanent chip lists initially; filters live in GlassSheet.
     await tester.tap(find.text('پیامک‌ها').last, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.text('پیامک‌های بانکی'), findsOneWidget);
-    // Selected GlassChip must use a single uniform glass tint (transparent
+    expect(find.byType(GlassChip), findsNothing);
+    expect(find.text('همه زمان‌ها'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.search_rounded).last);
+    await tester.pumpAndSettle();
+    expect(find.byType(GlassSearchBar), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.filter_alt_outlined).last);
+    await tester.pumpAndSettle();
+    expect(find.text('فیلتر پیامک‌های بانکی'), findsOneWidget);
+    await tester.tap(find.text('تراکنش').last);
+    await tester.tap(find.text('امروز'));
+    await tester.ensureVisible(find.text('اعمال فیلتر'));
+    await tester.tap(find.text('اعمال فیلتر'));
+    await tester.pumpAndSettle();
+    expect(find.text('فیلتر پیامک‌های بانکی'), findsNothing);
+
+    // Active GlassChip must use a single uniform glass tint (transparent
     // selectedColor prevents two-tone nested pill inside horizontal lists).
     final GlassChip selectedMsgChip = tester.widget<GlassChip>(
       find.byType(GlassChip).first,
@@ -225,23 +244,43 @@ void main() {
       selectedMsgChip.labelStyle?.color != selectedMsgChip.settings?.glassColor,
       isTrue,
     );
-    expect(find.text('همه زمان‌ها'), findsNothing);
-    await tester.tap(find.byIcon(Icons.search_rounded).last);
-    await tester.pumpAndSettle();
-    expect(find.byType(GlassSearchBar), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.close_rounded).last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.calendar_month_rounded).last);
-    await tester.pumpAndSettle();
-    expect(find.text('فیلتر زمانی پیامک‌ها'), findsOneWidget);
-    await tester.tap(find.text('امروز'));
-    await tester.pumpAndSettle();
     expect(find.text('امروز'), findsWidgets);
+    await tester.drag(find.text('امروز').last, const Offset(180, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('پاک کردن همه'));
+    await tester.pumpAndSettle();
+    expect(find.byType(GlassChip), findsNothing);
 
-    // Switch to Transactions tab, test Jalali date filter sheet via calendar icon, and edit sheet.
+    // Switch to Transactions tab: clean header with FilterActionButton and unified GlassSheet.
     await tester.tap(find.text('تراکنش‌ها').last, warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(find.byType(TransactionTile), findsOneWidget);
+    expect(find.byType(GlassChip), findsNothing);
+    expect(find.text('همه زمان‌ها'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.filter_alt_outlined).last);
+    await tester.pumpAndSettle();
+    expect(find.text('فیلتر تراکنش‌ها'), findsOneWidget);
+
+    // Custom Jalali period picker switches in-place inside the same GlassSheet.
+    await tester.ensureVisible(find.text('انتخاب ماه یا سال شمسی'));
+    await tester.tap(find.text('انتخاب ماه یا سال شمسی'));
+    await tester.pumpAndSettle();
+    expect(find.byType(GlassSheet), findsOneWidget);
+    expect(find.text('فیلتر زمانی تراکنش‌ها'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('فیلتر تراکنش‌ها'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('این ماه').last);
+    await tester.tap(find.text('این ماه').last);
+    await tester.ensureVisible(find.text('حمل‌ونقل').last);
+    await tester.tap(find.text('حمل‌ونقل').last);
+    await tester.ensureVisible(find.text('اعمال فیلتر'));
+    await tester.tap(find.text('اعمال فیلتر'));
+    await tester.pumpAndSettle();
+    expect(find.text('فیلتر تراکنش‌ها'), findsNothing);
+
     final GlassChip selectedTxChip = tester.widget<GlassChip>(
       find.byType(GlassChip).first,
     );
@@ -252,13 +291,6 @@ void main() {
       selectedTxChip.labelStyle?.color != selectedTxChip.settings?.glassColor,
       isTrue,
     );
-    expect(find.text('همه زمان‌ها'), findsNothing);
-
-    await tester.tap(find.byIcon(Icons.calendar_month_rounded).last);
-    await tester.pumpAndSettle();
-    expect(find.text('فیلتر زمانی تراکنش‌ها'), findsOneWidget);
-    await tester.tap(find.text('این ماه').last);
-    await tester.pumpAndSettle();
     expect(find.byType(TransactionTile), findsOneWidget);
 
     await tester.tap(find.byType(TransactionTile));

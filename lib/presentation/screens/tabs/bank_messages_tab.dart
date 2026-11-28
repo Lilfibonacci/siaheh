@@ -12,6 +12,7 @@ import 'package:siaheh/presentation/bloc/finance/finance_state.dart';
 import 'package:siaheh/presentation/bloc/finance/finance_mapper.dart';
 import 'package:siaheh/presentation/bloc/finance/finance_ui_models.dart';
 import 'package:siaheh/presentation/widgets/bank_logo.dart';
+import 'package:siaheh/presentation/widgets/filter_sheets.dart';
 import 'package:siaheh/presentation/widgets/jalali_period_picker.dart';
 import 'package:siaheh/presentation/widgets/transaction_edit_sheet.dart';
 
@@ -37,6 +38,26 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
     super.dispose();
   }
 
+  Future<void> _openFilterSheet(FinanceMapper mapper) async {
+    final MessageFilterSelection? picked = await showMessageFilterSheet(
+      context: context,
+      initial: MessageFilterSelection(
+        kind: _selectedKind,
+        bankKey: _selectedBankKey,
+        dateFilter: _dateFilter,
+      ),
+      banks: mapper.detectedBanks,
+      messageCountForBank: mapper.messageCountForBank,
+      countsByYearMonth: mapper.messageCountsByYearMonth,
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedKind = picked.kind;
+      _selectedBankKey = picked.bankKey;
+      _dateFilter = picked.dateFilter;
+    });
+  }
+
   Future<void> _openDateFilterPicker(FinanceMapper mapper) async {
     final JalaliDateFilter? picked = await showJalaliPeriodPickerSheet(
       context: context,
@@ -51,6 +72,14 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
     if (picked != null && mounted) {
       setState(() => _dateFilter = picked);
     }
+  }
+
+  void _clearAllFilters() {
+    setState(() {
+      _selectedKind = null;
+      _selectedBankKey = null;
+      _dateFilter = const JalaliDateFilter.all();
+    });
   }
 
   List<BankSmsMessage> _filtered(List<BankSmsMessage> all) {
@@ -87,9 +116,15 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
     final List<BankSmsMessage> allMessages = mapper.activeBankMessages;
     final List<UiBank> banks = mapper.detectedBanks;
     final List<BankSmsMessage> items = _filtered(allMessages);
-    final String subtitle = _dateFilter.isActive
+    final int activeFilterCount =
+        (_selectedKind != null ? 1 : 0) +
+        (_selectedBankKey != null ? 1 : 0) +
+        (_dateFilter.isActive ? 1 : 0);
+    final String subtitle =
+        activeFilterCount > 0 || _searchController.text.trim().isNotEmpty
         ? PersianFormat.digits(
-            '${items.length} از ${allMessages.length} پیامک • ${_dateFilter.label}',
+            '${items.length} از ${allMessages.length} پیامک'
+            '${_dateFilter.isActive ? ' • ${_dateFilter.label}' : ''}',
           )
         : PersianFormat.digits(
             '${allMessages.length} پیامک از ${banks.length} بانک',
@@ -129,24 +164,10 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      GlassButton.custom(
-                        useOwnLayer: true,
-                        quality: GlassQuality.standard,
-                        width: 42,
-                        height: 42,
-                        stretch: 0.15,
-                        tintColor: _dateFilter.isActive
-                            ? scheme.primary.withValues(alpha: 0.20)
-                            : null,
-                        label: 'فیلتر زمانی',
-                        onTap: () => _openDateFilterPicker(mapper),
-                        child: Icon(
-                          Icons.calendar_month_rounded,
-                          size: 20,
-                          color: _dateFilter.isActive
-                              ? scheme.primary
-                              : scheme.onSurface,
-                        ),
+                      FilterActionButton(
+                        activeCount: activeFilterCount,
+                        size: 42,
+                        onTap: () => _openFilterSheet(mapper),
                       ),
                       const SizedBox(width: 6),
                       GlassButton.custom(
@@ -224,7 +245,7 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
                 onChanged: (_) => setState(() {}),
               ),
             ),
-          if (banks.length > 1) ...[
+          if (activeFilterCount > 0) ...[
             const SizedBox(height: 12),
             SizedBox(
               height: 38,
@@ -233,24 +254,60 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
-                    Center(
-                      child: _KindChip(
-                        label: PersianFormat.digits(
-                          'همه بانک‌ها (${allMessages.length})',
-                        ),
-                        selected: _selectedBankKey == null,
-                        onTap: () => setState(() => _selectedBankKey = null),
-                      ),
-                    ),
-                    for (final UiBank b in banks)
+                    if (_selectedKind != null)
                       Center(
-                        child: _KindChip(
-                          leading: BankLogo(bankKey: b.key, size: 18),
-                          label: PersianFormat.digits(
-                            '${b.name} (${mapper.messageCountForBank(b.key)})',
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: SiahehGlassChip(
+                            selected: true,
+                            label: bankSmsKindLabel(_selectedKind!),
+                            onTap: () => _openFilterSheet(mapper),
+                            onDeleted: () =>
+                                setState(() => _selectedKind = null),
                           ),
-                          selected: _selectedBankKey == b.key,
-                          onTap: () => setState(() => _selectedBankKey = b.key),
+                        ),
+                      ),
+                    if (_selectedBankKey != null)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: SiahehGlassChip(
+                            selected: true,
+                            icon: BankLogo(
+                              bankKey: _selectedBankKey!,
+                              size: 18,
+                            ),
+                            label: FinanceMapper.bank(_selectedBankKey!).name,
+                            onTap: () => _openFilterSheet(mapper),
+                            onDeleted: () =>
+                                setState(() => _selectedBankKey = null),
+                          ),
+                        ),
+                      ),
+                    if (_dateFilter.isActive)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: JalaliDateFilterChip(
+                            filter: _dateFilter,
+                            onTap: () => _openDateFilterPicker(mapper),
+                            onClear: () => setState(
+                              () => _dateFilter = const JalaliDateFilter.all(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (activeFilterCount >= 2)
+                      Center(
+                        child: SiahehGlassChip(
+                          selected: false,
+                          icon: Icon(
+                            Icons.clear_all_rounded,
+                            size: 16,
+                            color: scheme.onSurface.withValues(alpha: 0.78),
+                          ),
+                          label: 'پاک کردن همه',
+                          onTap: _clearAllFilters,
                         ),
                       ),
                   ],
@@ -258,70 +315,6 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 38,
-            child: GlassBackdropGroup(
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  if (_dateFilter.isActive) ...[
-                    Center(
-                      child: JalaliDateFilterChip(
-                        filter: _dateFilter,
-                        onTap: () => _openDateFilterPicker(mapper),
-                        onClear: () => setState(
-                          () => _dateFilter = const JalaliDateFilter.all(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Center(
-                    child: _KindChip(
-                      label: 'همه',
-                      selected: _selectedKind == null,
-                      onTap: () => setState(() => _selectedKind = null),
-                    ),
-                  ),
-                  Center(
-                    child: _KindChip(
-                      label: 'تراکنش',
-                      selected: _selectedKind == BankSmsKind.transaction,
-                      onTap: () => setState(
-                        () => _selectedKind = BankSmsKind.transaction,
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: _KindChip(
-                      label: 'اطلاع‌رسانی',
-                      selected: _selectedKind == BankSmsKind.info,
-                      onTap: () =>
-                          setState(() => _selectedKind = BankSmsKind.info),
-                    ),
-                  ),
-                  Center(
-                    child: _KindChip(
-                      label: 'رمز پویا',
-                      selected: _selectedKind == BankSmsKind.otp,
-                      onTap: () =>
-                          setState(() => _selectedKind = BankSmsKind.otp),
-                    ),
-                  ),
-                  Center(
-                    child: _KindChip(
-                      label: 'پارس‌نشده',
-                      selected: _selectedKind == BankSmsKind.unparsed,
-                      onTap: () =>
-                          setState(() => _selectedKind = BankSmsKind.unparsed),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           const SizedBox(height: 8),
           Expanded(
             child: !state.hasPermission
@@ -383,33 +376,6 @@ class _BankMessagesTabState extends State<BankMessagesTab> {
                   ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _KindChip extends StatelessWidget {
-  const _KindChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.leading,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Widget? leading;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: SiahehGlassChip(
-        icon: leading,
-        label: label,
-        selected: selected,
-        onTap: onTap,
       ),
     );
   }
